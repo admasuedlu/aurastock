@@ -1,0 +1,28 @@
+# Python / Django
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/migrations/*.pyc
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+backend/.env
+*.pyc
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/ios/Flutter/Flutter.podspec
+frontend/ios/Pods/
+frontend/**/*.iml
+frontend/.idea/
+
+# General
+.DS_Store
+*.log
+.claude/
