@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import CompanyScopedModel
@@ -41,7 +43,7 @@ class UnitOfMeasure(CompanyScopedModel):
         help_text="e.g. carton's base unit is piece",
     )
     conversion_factor = models.DecimalField(
-        max_digits=12, decimal_places=4, default=1,
+        max_digits=12, decimal_places=4, default=Decimal("1"),
         help_text="Multiply by this to convert 1 of this unit into base_unit",
     )
 
@@ -69,13 +71,13 @@ class Product(CompanyScopedModel):
     unit = models.ForeignKey(UnitOfMeasure, on_delete=models.PROTECT, related_name="products")
     product_type = models.CharField(max_length=20, choices=ProductType.choices, default=ProductType.SIMPLE)
 
-    cost_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    selling_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    tax_rate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=15,
+    cost_price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    selling_price = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0"))
+    tax_rate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("15"),
                                             help_text="Ethiopian standard VAT is 15%")
 
-    reorder_level = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    safety_stock = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reorder_level = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    safety_stock = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
     track_serial = models.BooleanField(default=False)
     track_batch = models.BooleanField(default=False)

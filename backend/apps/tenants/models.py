@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import CompanyScopedModel, TimeStampedModel
@@ -6,7 +8,7 @@ from apps.core.models import CompanyScopedModel, TimeStampedModel
 class SubscriptionPlan(TimeStampedModel):
     name = models.CharField(max_length=100)
     code = models.SlugField(unique=True)
-    price_monthly_etb = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    price_monthly_etb = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     max_users = models.PositiveIntegerField(default=5)
     max_branches = models.PositiveIntegerField(default=1)
     max_warehouses = models.PositiveIntegerField(default=1)

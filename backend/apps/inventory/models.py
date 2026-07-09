@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import CompanyScopedModel
@@ -30,11 +32,11 @@ class StockItem(CompanyScopedModel):
     variant = models.ForeignKey(
         "products.ProductVariant", on_delete=models.CASCADE, related_name="stock_items", null=True, blank=True,
     )
-    quantity_on_hand = models.DecimalField(max_digits=14, decimal_places=3, default=0)
-    reserved_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=0)
-    incoming_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=0)
-    damaged_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=0)
-    average_cost = models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    quantity_on_hand = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+    reserved_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+    incoming_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+    damaged_quantity = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+    average_cost = models.DecimalField(max_digits=14, decimal_places=4, default=Decimal("0"))
 
     class Meta:
         unique_together = ("company", "warehouse", "product", "variant")
@@ -68,7 +70,7 @@ class StockMovement(CompanyScopedModel):
     )
     movement_type = models.CharField(max_length=20, choices=MovementType.choices)
     quantity = models.DecimalField(max_digits=14, decimal_places=3)
-    unit_cost = models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    unit_cost = models.DecimalField(max_digits=14, decimal_places=4, default=Decimal("0"))
     reference = models.CharField(max_length=100, blank=True, help_text="PO/SO/GRN number etc.")
     reason = models.CharField(max_length=255, blank=True)
     created_by = models.ForeignKey(

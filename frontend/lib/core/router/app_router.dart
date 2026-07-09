@@ -9,6 +9,8 @@ import '../../features/auth/providers/auth_controller.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/products/presentation/product_list_screen.dart';
+import '../../features/purchasing/presentation/purchasing_screen.dart';
+import '../../features/sales/presentation/sales_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 
@@ -54,6 +56,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/', builder: (context, state) => const DashboardScreen()),
           GoRoute(path: '/products', builder: (context, state) => const ProductListScreen()),
           GoRoute(path: '/inventory', builder: (context, state) => const InventoryScreen()),
+          GoRoute(path: '/sales', builder: (context, state) => const SalesScreen()),
+          GoRoute(path: '/purchases', builder: (context, state) => const PurchasingScreen()),
           GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
         ],
       ),

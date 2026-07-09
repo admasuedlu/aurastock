@@ -2,11 +2,17 @@
 
 Multi-tenant inventory & order management platform for Ethiopia, inspired by Zoho Inventory.
 
-This repo currently contains the **foundation slice**: multi-tenant auth, company/branch
-setup, product catalog, and core stock in/out/transfer/adjustment inventory operations.
-The full spec (POS, purchasing, sales, accounting, AI forecasting, payment gateway
-integrations, etc.) is a large, multi-phase build — this is the base everything else
-will be layered onto.
+This repo is being built in phases. **Phase 1 (foundation):** multi-tenant auth,
+company/branch setup, product catalog, core stock in/out/transfer/adjustment inventory
+operations. **Phase 2 (order management):** customers, suppliers, quotations/sales
+orders/invoices/payments, and purchase orders/goods receipts — wired directly into the
+Phase 1 inventory engine (confirming an invoice deducts stock, receiving goods adds it).
+
+The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
+gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
+etc.) is a large, multi-phase build. Each phase is built with the same rigor as the
+last: real backend logic, migrations run and verified, and every flow smoke-tested via
+the actual API before moving on — not stub screens wired to fake data.
 
 ## Structure
 
@@ -63,12 +69,29 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 - Inventory: warehouses, stock in/out/transfer/adjustment with weighted-average
   costing, insufficient-stock guards, low-stock querying, and full movement history
 - Real-time stock updates over WebSocket (JWT-authenticated) for dashboard/warehouse screens
+- Customers and suppliers (basic CRM/vendor records with credit limit / payment terms)
+- Sales: quotations, sales orders, and invoices with line items, discounts, and tax;
+  confirming an invoice deducts stock via the Phase 1 inventory service; payments
+  (cash/bank/Telebirr/CBE Pay/M-Pesa/Amole as payment *methods* — gateway integrations
+  themselves are not built) track amount paid / balance due and auto-transition invoice status
+- Purchasing: purchase orders with line items; goods receipts against a PO (full or
+  partial) add stock via the same inventory service and auto-update PO status
+  (draft → sent → approved → partially_received → received); over-receiving is blocked
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
   mobile), product list + add-product, inventory stock levels/history with stock
-  action sheets, settings (language switch, theme, logout)
+  action sheets, a Sales section (orders/invoices/customers) with invoice confirm and
+  payment actions, a Purchasing section (orders/suppliers) with a receive-goods flow,
+  settings (language switch, theme, logout)
+- A demo tenant (`demo@aurastock.local` / `DemoPass123!`) seeded with products, stock,
+  a completed purchase→receive cycle, and a confirmed/partially-paid invoice, for
+  quickly seeing the app with real data instead of an empty state
 
 ## Known gaps (not yet built)
 
-Sales, POS, purchasing, accounting, reporting/analytics, AI features, customer/supplier
-portals, notifications, Ethiopian payment gateway integrations (Telebirr/CBE/M-Pesa/Amole),
-and the Ethiopian calendar UI are not implemented yet — they build on this foundation.
+POS, accounting (chart of accounts, journal entries, VAT/WHT reports, P&L/balance
+sheet), reporting & analytics, AI features (forecasting, anomaly detection), customer/
+supplier portals, notifications (SMS/email/push/WhatsApp), actual Ethiopian payment
+gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
+*methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
+requests/approvals workflow, quotation→sales-order→invoice conversion (each is created
+independently for now), and SaaS platform-admin screens are not implemented yet.
