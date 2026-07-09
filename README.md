@@ -7,6 +7,9 @@ company/branch setup, product catalog, core stock in/out/transfer/adjustment inv
 operations. **Phase 2 (order management):** customers, suppliers, quotations/sales
 orders/invoices/payments, and purchase orders/goods receipts — wired directly into the
 Phase 1 inventory engine (confirming an invoice deducts stock, receiving goods adds it).
+**Phase 3 (POS):** till sessions with cash reconciliation, and point-of-sale
+transactions with instant stock deduction and refunds — also wired into the same
+inventory engine.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -82,12 +85,22 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   blocked; payments against a PO track amount paid / balance due independently of
   receiving (you can pay a supplier before, during, or after goods arrive);
   overpayment is blocked
+- POS: a cashier opens a till session against a warehouse with an opening cash float;
+  ringing up a sale deducts stock immediately (no separate confirm step, unlike
+  invoices); refunding a completed sale restores stock **at the cost it left at**
+  (looked up from the original stock movement, not today's average — so a refund
+  doesn't dilute the remaining stock's weighted-average cost); closing a session
+  computes expected cash (opening float + completed cash sales) against what the
+  cashier counted, surfacing the variance; a cashier can only have one open session
+  at a time, and a closed session rejects new sales
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
   mobile), product list + add-product, inventory stock levels/history with stock
   action sheets, a Sales section (quotations/orders/invoices/customers) with
   quotation-to-order conversion and invoice confirm/payment actions, a Purchasing
-  section (orders/suppliers) with combined receive-goods/record-payment actions,
-  settings (language switch, theme, logout)
+  section (orders/suppliers) with combined receive-goods/record-payment actions, a
+  POS screen (touch-friendly product grid, cart, checkout with change-due
+  calculation, today's-sales history with refund, shift open/close), settings
+  (language switch, theme, logout)
 - A demo tenant (`demo@aurastock.local` / `DemoPass123!`) can be seeded with sample
   products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
   invoice — ask to have it recreated, since the dev SQLite database is not persisted
@@ -95,11 +108,12 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 
 ## Known gaps (not yet built)
 
-POS, accounting (chart of accounts, journal entries, VAT/WHT reports, P&L/balance
-sheet), reporting & analytics, AI features (forecasting, anomaly detection), customer/
-supplier portals, notifications (SMS/email/push/WhatsApp), actual Ethiopian payment
-gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
+Accounting (chart of accounts, journal entries, VAT/WHT reports, P&L/balance sheet),
+reporting & analytics, AI features (forecasting, anomaly detection), customer/supplier
+portals, notifications (SMS/email/push/WhatsApp), actual Ethiopian payment gateway
+integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
 *methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
 requests/approvals workflow, sales-order→invoice conversion (invoices are still created
-independently of an order for now), and SaaS platform-admin screens are not
-implemented yet.
+independently of an order for now), receipt printing / physical cash-drawer / barcode-
+scanner hardware integration, offline-mode sync for POS, and SaaS platform-admin
+screens are not implemented yet.
