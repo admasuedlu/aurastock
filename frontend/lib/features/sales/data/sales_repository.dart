@@ -7,6 +7,25 @@ class SalesRepository {
   SalesRepository(this._dio);
   final Dio _dio;
 
+  Future<List<Quotation>> fetchQuotations() async {
+    final response = await _dio.get('/quotations/');
+    final results = response.data['results'] as List;
+    return results.map((e) => Quotation.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<Quotation> createQuotation({required String customerId, required List<LineItemDraft> items}) async {
+    final response = await _dio.post('/quotations/', data: {
+      'customer': customerId,
+      'items': _itemPayload(items),
+    });
+    return Quotation.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<SalesOrder> convertQuotationToOrder(String quotationId) async {
+    final response = await _dio.post('/quotations/$quotationId/convert-to-order/');
+    return SalesOrder.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<List<SalesOrder>> fetchSalesOrders() async {
     final response = await _dio.get('/sales-orders/');
     final results = response.data['results'] as List;

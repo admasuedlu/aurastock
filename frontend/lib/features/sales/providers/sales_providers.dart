@@ -8,6 +8,10 @@ final salesRepositoryProvider = Provider<SalesRepository>((ref) {
   return SalesRepository(ref.watch(apiClientProvider).dio);
 });
 
+final quotationListProvider = FutureProvider.autoDispose<List<Quotation>>((ref) {
+  return ref.watch(salesRepositoryProvider).fetchQuotations();
+});
+
 final salesOrderListProvider = FutureProvider.autoDispose<List<SalesOrder>>((ref) {
   return ref.watch(salesRepositoryProvider).fetchSalesOrders();
 });

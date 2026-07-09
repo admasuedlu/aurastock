@@ -10,13 +10,17 @@ from rest_framework.response import Response
 from apps.core.viewsets import CompanyScopedViewSet
 from apps.inventory.services import stock_out
 
-from .models import Invoice, Quotation, SalesOrder, SalesPayment
+from apps.core.numbering import next_value
+
+from .models import Invoice, Quotation, SalesOrder, SalesOrderItem, SalesPayment
 from .serializers import (
     InvoiceSerializer,
     QuotationSerializer,
     SalesOrderSerializer,
     SalesPaymentSerializer,
 )
+
+_UNCONVERTIBLE_QUOTATION_STATUSES = (Quotation.Status.CONVERTED, Quotation.Status.REJECTED, Quotation.Status.EXPIRED)
 
 
 class QuotationViewSet(CompanyScopedViewSet):
@@ -26,6 +30,40 @@ class QuotationViewSet(CompanyScopedViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="convert-to-order")
+    @transaction.atomic
+    def convert_to_order(self, request, pk=None):
+        quotation = self.get_object()
+        if quotation.status in _UNCONVERTIBLE_QUOTATION_STATUSES:
+            raise DRFValidationError(f"A {quotation.get_status_display().lower()} quotation cannot be converted.")
+
+        quotation_items = list(quotation.items.select_related("product", "variant").all())
+        if not quotation_items:
+            raise DRFValidationError("Quotation has no line items to convert.")
+
+        order = SalesOrder.objects.create(
+            company=quotation.company, customer=quotation.customer, quotation=quotation,
+            created_by=request.user,
+            number=next_value(quotation.company, "sales_order", default_prefix="SO-"),
+        )
+
+        order_items = [
+            SalesOrderItem(
+                company=quotation.company, sales_order=order, product=item.product, variant=item.variant,
+                quantity=item.quantity, unit_price=item.unit_price,
+                discount_percent=item.discount_percent, tax_percent=item.tax_percent,
+            )
+            for item in quotation_items
+        ]
+        SalesOrderItem.objects.bulk_create(order_items)
+        order.recalculate_totals(order_items)
+        order.save(update_fields=["subtotal", "discount_total", "tax_total", "total"])
+
+        quotation.status = Quotation.Status.CONVERTED
+        quotation.save(update_fields=["status", "updated_at"])
+
+        return Response(SalesOrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
 class SalesOrderViewSet(CompanyScopedViewSet):

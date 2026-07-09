@@ -7,8 +7,10 @@ import '../../customers/presentation/customer_form_sheet.dart';
 import '../../customers/providers/customer_providers.dart';
 import '../providers/sales_providers.dart';
 import 'create_invoice_sheet.dart';
+import 'create_quotation_sheet.dart';
 import 'create_sales_order_sheet.dart';
 import 'invoice_actions_sheet.dart';
+import 'quotation_actions_sheet.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -25,11 +27,17 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       case 'paid':
       case 'fulfilled':
       case 'confirmed':
+      case 'accepted':
         return Colors.green;
       case 'partially_paid':
+      case 'sent':
         return Colors.orange;
       case 'cancelled':
+      case 'rejected':
+      case 'expired':
         return Colors.red;
+      case 'converted':
+        return Theme.of(context).colorScheme.primary;
       default:
         return Theme.of(context).colorScheme.outline;
     }
@@ -39,35 +47,74 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
+    final quotationsAsync = ref.watch(quotationListProvider);
     final salesOrdersAsync = ref.watch(salesOrderListProvider);
     final invoicesAsync = ref.watch(invoiceListProvider);
     final customersAsync = ref.watch(customerListProvider);
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.sales),
           bottom: TabBar(
+            isScrollable: true,
             onTap: (i) => setState(() => _tabIndex = i),
-            tabs: const [Tab(text: 'Sales Orders'), Tab(text: 'Invoices'), Tab(text: 'Customers')],
+            tabs: const [
+              Tab(text: 'Quotations'),
+              Tab(text: 'Sales Orders'),
+              Tab(text: 'Invoices'),
+              Tab(text: 'Customers'),
+            ],
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: switch (_tabIndex) {
-            0 => () => showCreateSalesOrderSheet(context),
-            1 => () => showCreateInvoiceSheet(context),
+            0 => () => showCreateQuotationSheet(context),
+            1 => () => showCreateSalesOrderSheet(context),
+            2 => () => showCreateInvoiceSheet(context),
             _ => () => showCustomerFormSheet(context),
           },
           icon: const Icon(Icons.add),
           label: Text(switch (_tabIndex) {
-            0 => 'New Order',
-            1 => 'New Invoice',
+            0 => 'New Quotation',
+            1 => 'New Order',
+            2 => 'New Invoice',
             _ => 'Add Customer',
           }),
         ),
         body: TabBarView(
           children: [
+            quotationsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text(l10n.errorGeneric)),
+              data: (quotations) {
+                if (quotations.isEmpty) return Center(child: Text(l10n.noData));
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: quotations.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final quotation = quotations[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text(quotation.number),
+                        subtitle: Text(quotation.customerName),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(currency.format(quotation.total)),
+                            Text(quotation.status, style: TextStyle(color: _statusColor(quotation.status, context))),
+                          ],
+                        ),
+                        onTap: () => showQuotationActionsSheet(context, ref, quotation),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
             salesOrdersAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, _) => Center(child: Text(l10n.errorGeneric)),

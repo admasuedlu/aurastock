@@ -1,3 +1,29 @@
+class Quotation {
+  Quotation({
+    required this.id,
+    required this.number,
+    required this.customerName,
+    required this.status,
+    required this.total,
+  });
+
+  factory Quotation.fromJson(Map<String, dynamic> json) {
+    return Quotation(
+      id: json['id'] as String,
+      number: json['number'] as String,
+      customerName: json['customer_name'] as String? ?? '',
+      status: json['status'] as String,
+      total: double.tryParse(json['total'].toString()) ?? 0,
+    );
+  }
+
+  final String id;
+  final String number;
+  final String customerName;
+  final String status;
+  final double total;
+}
+
 class SalesOrder {
   SalesOrder({
     required this.id,

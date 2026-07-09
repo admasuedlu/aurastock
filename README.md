@@ -70,21 +70,28 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   costing, insufficient-stock guards, low-stock querying, and full movement history
 - Real-time stock updates over WebSocket (JWT-authenticated) for dashboard/warehouse screens
 - Customers and suppliers (basic CRM/vendor records with credit limit / payment terms)
-- Sales: quotations, sales orders, and invoices with line items, discounts, and tax;
-  confirming an invoice deducts stock via the Phase 1 inventory service; payments
-  (cash/bank/Telebirr/CBE Pay/M-Pesa/Amole as payment *methods* — gateway integrations
-  themselves are not built) track amount paid / balance due and auto-transition invoice status
+- Sales: quotations (convertible to a sales order, copying line items and locking the
+  quotation as `converted`), sales orders, and invoices with line items, discounts,
+  and tax; confirming an invoice deducts stock via the Phase 1 inventory service;
+  payments (cash/bank/Telebirr/CBE Pay/M-Pesa/Amole as payment *methods* — gateway
+  integrations themselves are not built) track amount paid / balance due and
+  auto-transition invoice status
 - Purchasing: purchase orders with line items; goods receipts against a PO (full or
   partial) add stock via the same inventory service and auto-update PO status
-  (draft → sent → approved → partially_received → received); over-receiving is blocked
+  (draft → sent → approved → partially_received → received); over-receiving is
+  blocked; payments against a PO track amount paid / balance due independently of
+  receiving (you can pay a supplier before, during, or after goods arrive);
+  overpayment is blocked
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
   mobile), product list + add-product, inventory stock levels/history with stock
-  action sheets, a Sales section (orders/invoices/customers) with invoice confirm and
-  payment actions, a Purchasing section (orders/suppliers) with a receive-goods flow,
+  action sheets, a Sales section (quotations/orders/invoices/customers) with
+  quotation-to-order conversion and invoice confirm/payment actions, a Purchasing
+  section (orders/suppliers) with combined receive-goods/record-payment actions,
   settings (language switch, theme, logout)
-- A demo tenant (`demo@aurastock.local` / `DemoPass123!`) seeded with products, stock,
-  a completed purchase→receive cycle, and a confirmed/partially-paid invoice, for
-  quickly seeing the app with real data instead of an empty state
+- A demo tenant (`demo@aurastock.local` / `DemoPass123!`) can be seeded with sample
+  products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
+  invoice — ask to have it recreated, since the dev SQLite database is not persisted
+  between sessions
 
 ## Known gaps (not yet built)
 
@@ -93,5 +100,6 @@ sheet), reporting & analytics, AI features (forecasting, anomaly detection), cus
 supplier portals, notifications (SMS/email/push/WhatsApp), actual Ethiopian payment
 gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
 *methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
-requests/approvals workflow, quotation→sales-order→invoice conversion (each is created
-independently for now), and SaaS platform-admin screens are not implemented yet.
+requests/approvals workflow, sales-order→invoice conversion (invoices are still created
+independently of an order for now), and SaaS platform-admin screens are not
+implemented yet.

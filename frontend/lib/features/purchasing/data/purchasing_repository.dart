@@ -38,4 +38,12 @@ class PurchasingRepository {
       'items': items,
     });
   }
+
+  Future<PurchaseOrder> recordPayment(String purchaseOrderId, {required double amount, required String method}) async {
+    final response = await _dio.post('/purchase-orders/$purchaseOrderId/record-payment/', data: {
+      'amount': amount,
+      'method': method,
+    });
+    return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
+  }
 }

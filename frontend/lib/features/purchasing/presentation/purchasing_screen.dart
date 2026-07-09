@@ -7,7 +7,7 @@ import '../../suppliers/presentation/supplier_form_sheet.dart';
 import '../../suppliers/providers/supplier_providers.dart';
 import '../providers/purchasing_providers.dart';
 import 'create_purchase_order_sheet.dart';
-import 'receive_goods_sheet.dart';
+import 'purchase_order_actions_sheet.dart';
 
 class PurchasingScreen extends ConsumerStatefulWidget {
   const PurchasingScreen({super.key});
@@ -69,7 +69,6 @@ class _PurchasingScreenState extends ConsumerState<PurchasingScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final order = orders[index];
-                    final canReceive = order.status != 'received' && order.status != 'cancelled';
                     return Card(
                       child: ListTile(
                         title: Text(order.number),
@@ -82,7 +81,7 @@ class _PurchasingScreenState extends ConsumerState<PurchasingScreen> {
                             Text(order.status, style: TextStyle(color: _statusColor(order.status, context))),
                           ],
                         ),
-                        onTap: canReceive ? () => showReceiveGoodsSheet(context, order) : null,
+                        onTap: () => showPurchaseOrderActionsSheet(context, ref, order),
                       ),
                     );
                   },
