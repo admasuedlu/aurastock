@@ -10,6 +10,7 @@ import '../../features/auth/providers/auth_controller.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/insights/presentation/insights_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/products/presentation/product_list_screen.dart';
 import '../../features/purchasing/presentation/purchasing_screen.dart';
@@ -66,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/accounting', builder: (context, state) => const AccountingScreen()),
           GoRoute(path: '/reports', builder: (context, state) => const ReportsScreen()),
           GoRoute(path: '/insights', builder: (context, state) => const InsightsScreen()),
+          GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
           GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
         ],
       ),

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../auth/providers/auth_controller.dart';
 import '../../inventory/providers/inventory_providers.dart';
+import '../../notifications/providers/notifications_providers.dart';
 import '../../products/providers/product_providers.dart';
 import '../../reports/domain/report_models.dart';
 import '../../reports/providers/reports_providers.dart';
@@ -22,12 +23,22 @@ class DashboardScreen extends ConsumerWidget {
     final productsAsync = ref.watch(productListProvider);
     final stockAsync = ref.watch(stockItemListProvider);
     final salesSummaryAsync = ref.watch(salesSummaryProvider);
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.dashboard),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: unreadCount > 0,
+              label: Text('$unreadCount'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Notifications',
+            onPressed: () => context.go('/notifications'),
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart_outlined),
             tooltip: l10n.reports,

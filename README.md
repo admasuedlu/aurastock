@@ -19,7 +19,12 @@ since there was no sales data yet). **Phase 6 (AI insights):** reorder suggestio
 demand forecasting, and anomaly detection computed with real statistics (least-squares
 regression, mean/stdev) over actual sales history — not a call to an external LLM,
 which would need credentials this project doesn't have and couldn't be verified
-without them.
+without them. **Phase 7 (notifications):** a Notification model with a real-time
+push channel (WebSocket, same JWT-over-query-string pattern as Phase 1's inventory
+socket) plus dev-mode email — low-stock alerts fire automatically from the same
+`stock_out` choke point every sale already goes through, and overdue-invoice
+reminders are raised by a scan endpoint that simulates what a Celery beat schedule
+would run periodically (no beat schedule is actually wired up).
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -163,6 +168,43 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
   invoice — ask to have it recreated, since the dev SQLite database is not persisted
   between sessions
+- Notifications: a `Notification` model (company + optional personal `recipient`,
+  type, title/message/reference, read state) with a service layer, not a bare CRUD
+  resource. `notify_low_stock` is called from `apps/inventory/services.py:stock_out()`
+  — the one choke point already shared by the manual inventory stock-out view,
+  invoice confirm, and POS checkout — so a low-stock alert fires wherever stock
+  actually leaves, without three separate call sites to keep in sync. It dedupes:
+  no second unread notification for the same (company, type, reference) while an
+  earlier one is still unread, so a slow-selling item doesn't spam one row per sale,
+  but it does alert again once the existing one is acknowledged (verified: sold
+  below reorder level → 1 notification; sold again while still low → still 1;
+  marked read; sold again → a fresh 2nd notification). Overdue-invoice reminders
+  come from `scan_overdue_invoices`, exposed as `POST /notifications/scan_overdue/`
+  — it simulates what a Celery beat schedule would run periodically (no beat
+  schedule is actually wired up); it's addressed to the invoice's `created_by` where
+  known rather than broadcast company-wide. Real-time delivery reuses the Phase 1
+  JWT-over-query-string WebSocket pattern (`/ws/notifications/`), but with two
+  channel groups instead of one: personal notifications go only to a `user-{id}`
+  group and company-wide ones (like low stock) go to a `company-{id}` group, so a
+  reminder addressed to one salesperson doesn't flash across every other user's
+  screen — verified directly against the channel layer (a personal notification
+  reached the user's group and did *not* reach the company-wide group). The
+  broadcast and email side effects are wrapped in `transaction.on_commit()`, not
+  fired inline — `stock_out()` often runs inside an outer `@transaction.atomic`
+  block it doesn't own (invoice confirm looping over line items, POS checkout), so
+  firing immediately could push a "ghost" notification for a change that a later
+  error in the same request then rolls back. Email delivery uses Django's console
+  backend in dev (same `LOCAL_DEV_MODE` gating as the SQLite/locmem fallbacks) and
+  is real, not mocked; it's genuinely deliverable via SMTP in production once
+  `EMAIL_HOST`/credentials are configured. SMS/WhatsApp are **not** built — they'd
+  need Twilio/Africa's Talking/Meta Business API credentials this project doesn't
+  have, and faking a "sent" response would be worse than not having it; the service
+  layer is channel-agnostic, so adding a real provider later is one function plus
+  a call from `create_notification`, not a redesign. Flutter: a notification bell
+  with an unread-count badge in the dashboard app bar (following the existing
+  Reports/Insights icon-button precedent rather than crowding the 8-destination
+  main nav further) and a notification center screen that loads via REST and then
+  live-updates over the WebSocket.
 
 ## Known gaps (not yet built)
 
@@ -170,12 +212,16 @@ Beyond the sales/top-products/valuation/dead-stock reports and the three account
 reports, there's no purchase-trend report, no ABC analysis, no custom report builder,
 and no export to Excel/CSV/PDF. The AI insights are honest statistics on real data, not
 a "customer purchase prediction" or "intelligent dashboard" in the fuller sense of the
-original spec. Also not built: customer/supplier portals, notifications
-(SMS/email/push/WhatsApp), actual Ethiopian payment gateway integrations (Telebirr/
-CBE Pay/M-Pesa/Amole — currently just selectable payment *methods*, not live merchant
-integrations), the Ethiopian calendar UI, purchase requests/approvals workflow,
-sales-order→invoice conversion (invoices are still created independently of an order
-for now), receipt printing / physical cash-drawer / barcode-scanner hardware
-integration, offline-mode sync for POS, period-end closing entries and perpetual COGS
-posting (see the Accounting simplifications noted above), and SaaS platform-admin
-screens.
+original spec. Notifications only fire from `stock_out()`, not from `adjust_stock()` or
+`transfer_stock()`, so a manual stock adjustment or transfer that drops a product below
+its reorder level doesn't raise an alert (a human doing that adjustment already sees
+the number they typed); SMS/WhatsApp delivery is architected for but not implemented,
+per the note above. Also not built: customer/supplier portals, actual Ethiopian payment
+gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
+*methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
+requests/approvals workflow, sales-order→invoice conversion (invoices are still created
+independently of an order for now), receipt printing / physical cash-drawer /
+barcode-scanner hardware integration, offline-mode sync for POS, period-end closing
+entries and perpetual COGS posting (see the Accounting simplifications noted above),
+a real Celery beat schedule (the overdue-invoice scan is a POST endpoint that
+simulates one, not an actual periodic task), and SaaS platform-admin screens.

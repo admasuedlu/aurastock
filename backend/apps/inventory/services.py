@@ -3,6 +3,8 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from apps.notifications.services import notify_low_stock
+
 from .models import StockItem, StockMovement
 
 
@@ -48,6 +50,9 @@ def stock_out(*, company, warehouse, product, variant=None, quantity, reference=
         )
     stock_item.quantity_on_hand -= quantity
     stock_item.save(update_fields=["quantity_on_hand", "updated_at"])
+
+    if stock_item.quantity_on_hand <= stock_item.product.reorder_level:
+        notify_low_stock(stock_item=stock_item)
 
     return StockMovement.objects.create(
         company=company, warehouse=warehouse, product=product, variant=variant,
