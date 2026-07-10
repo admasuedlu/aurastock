@@ -12,6 +12,7 @@ import 'create_quotation_sheet.dart';
 import 'create_sales_order_sheet.dart';
 import 'invoice_actions_sheet.dart';
 import 'quotation_actions_sheet.dart';
+import 'sales_order_actions_sheet.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -139,6 +140,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                             Text(order.status, style: TextStyle(color: _statusColor(order.status, context))),
                           ],
                         ),
+                        onTap: () => showSalesOrderActionsSheet(context, ref, order),
                       ),
                     );
                   },

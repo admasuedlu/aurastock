@@ -37,6 +37,13 @@ class SalesRepository {
     return results.map((e) => SalesOrder.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<Invoice> convertSalesOrderToInvoice(String orderId, {required String warehouseId}) async {
+    final response = await _dio.post('/sales-orders/$orderId/convert-to-invoice/', data: {
+      'warehouse': warehouseId,
+    });
+    return Invoice.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<List<Invoice>> fetchInvoices() async {
     final response = await _dio.get('/invoices/');
     final results = response.data['results'] as List;

@@ -10,9 +10,10 @@ from rest_framework.response import Response
 from apps.accounting import services as accounting_services
 from apps.core.numbering import next_value
 from apps.core.viewsets import CompanyScopedViewSet
+from apps.inventory.models import Warehouse
 from apps.inventory.services import stock_out
 
-from .models import Invoice, Quotation, SalesOrder, SalesOrderItem, SalesPayment
+from .models import Invoice, InvoiceItem, Quotation, SalesOrder, SalesOrderItem, SalesPayment
 from .serializers import (
     InvoiceSerializer,
     QuotationSerializer,
@@ -85,6 +86,57 @@ class SalesOrderViewSet(CompanyScopedViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="convert-to-invoice")
+    @transaction.atomic
+    def convert_to_invoice(self, request, pk=None):
+        """Creates a draft invoice from a sales order, copying its line items
+        and linking back via Invoice.sales_order. Until now invoices were only
+        ever created standalone; this is the SO->invoice step of the sales
+        flow. An invoice needs a warehouse (to deduct stock from on confirm)
+        that the order doesn't carry, so the caller supplies it here."""
+        order = self.get_object()
+        if order.status == SalesOrder.Status.CANCELLED:
+            raise DRFValidationError("A cancelled sales order cannot be invoiced.")
+        if order.invoices.exists():
+            raise DRFValidationError("This sales order has already been invoiced.")
+
+        order_items = list(order.items.select_related("product", "variant").all())
+        if not order_items:
+            raise DRFValidationError("Sales order has no line items to invoice.")
+
+        warehouse_id = request.data.get("warehouse")
+        if not warehouse_id:
+            raise DRFValidationError({"warehouse": "This field is required."})
+        try:
+            warehouse = Warehouse.objects.get(company=order.company, pk=warehouse_id)
+        except (Warehouse.DoesNotExist, ValueError, DjangoValidationError):
+            raise DRFValidationError({"warehouse": "No warehouse with that id."})
+
+        invoice = Invoice.objects.create(
+            company=order.company, customer=order.customer, sales_order=order, warehouse=warehouse,
+            created_by=request.user, notes=order.notes, due_date=request.data.get("due_date") or None,
+            number=next_value(order.company, "invoice", default_prefix="INV-"),
+        )
+        invoice_items = [
+            InvoiceItem(
+                company=order.company, invoice=invoice, product=item.product, variant=item.variant,
+                quantity=item.quantity, unit_price=item.unit_price,
+                discount_percent=item.discount_percent, tax_percent=item.tax_percent,
+            )
+            for item in order_items
+        ]
+        InvoiceItem.objects.bulk_create(invoice_items)
+        invoice.recalculate_totals(invoice_items)
+        invoice.save(update_fields=["subtotal", "discount_total", "tax_total", "total"])
+
+        # The order is now a firm, invoiced order -- CONFIRMED rather than
+        # FULFILLED, since the goods don't actually leave until the invoice is
+        # confirmed. invoices.exists() above is what blocks a second invoice.
+        order.status = SalesOrder.Status.CONFIRMED
+        order.save(update_fields=["status", "updated_at"])
+
+        return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
 
 class InvoiceViewSet(CompanyScopedViewSet):
