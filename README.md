@@ -11,7 +11,11 @@ Phase 1 inventory engine (confirming an invoice deducts stock, receiving goods a
 transactions with instant stock deduction and refunds — also wired into the same
 inventory engine. **Phase 4 (accounting):** a real double-entry ledger, with every
 revenue/expense event from Phases 2-3 automatically posting a balanced journal entry —
-not a separate, disconnected bookkeeping module.
+not a separate, disconnected bookkeeping module. **Phase 5 (reporting & analytics):**
+sales trend/top-products/inventory-valuation/dead-stock reports computed live off the
+same data, plus wiring the dashboard's Today's Sales and Monthly Revenue cards to real
+numbers for the first time (they were a hardcoded 0 placeholder through Phase 1-4,
+since there was no sales data yet).
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -115,15 +119,26 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   exists), and COGS is never posted (no perpetual cost-of-goods-sold entry on sale),
   so P&L net income is currently gross margin minus operating expenses, not true
   net income.
+- Reports: sales summary (today/month/period totals + a daily series, combining
+  confirmed-or-later invoices and completed POS transactions — the two things that
+  actually represent a sale), top products by revenue (computed via a DB-level F()
+  expression replicating the line-item discount math, not a Python property, since
+  you can't `Sum()` a `@property`), inventory valuation (`quantity_on_hand *
+  average_cost` per product/warehouse, plus totals), and dead stock (on-hand
+  products with no `stock_out` movement in N days, found via a single grouped query
+  rather than one query per product). All hand-verified against seeded data with
+  known-correct expected numbers (e.g. a product sold 5 via invoice + 3 via POS
+  shows quantity_sold=8, revenue=8×price).
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
-  mobile), product list + add-product, inventory stock levels/history with stock
-  action sheets, a Sales section (quotations/orders/invoices/customers) with
-  quotation-to-order conversion and invoice confirm/payment actions, a Purchasing
-  section (orders/suppliers) with combined receive-goods/record-payment actions, a
-  POS screen (touch-friendly product grid, cart, checkout with change-due
-  calculation, today's-sales history with refund, shift open/close), an Accounting
-  section (expenses, trial balance, P&L, balance sheet), settings (language switch,
-  theme, logout)
+  mobile, real sales KPIs + a 30-day trend chart) with a Reports icon leading to
+  top-products/valuation/dead-stock tabs, product list + add-product, inventory
+  stock levels/history with stock action sheets, a Sales section (quotations/orders/
+  invoices/customers) with quotation-to-order conversion and invoice confirm/payment
+  actions, a Purchasing section (orders/suppliers) with combined receive-goods/
+  record-payment actions, a POS screen (touch-friendly product grid, cart, checkout
+  with change-due calculation, today's-sales history with refund, shift open/close),
+  an Accounting section (expenses, trial balance, P&L, balance sheet), settings
+  (language switch, theme, logout)
 - A demo tenant (`demo@aurastock.local` / `DemoPass123!`) can be seeded with sample
   products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
   invoice — ask to have it recreated, since the dev SQLite database is not persisted
@@ -131,13 +146,15 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 
 ## Known gaps (not yet built)
 
-Reporting & analytics (beyond the three accounting reports), AI features (forecasting,
-anomaly detection), customer/supplier portals, notifications (SMS/email/push/
-WhatsApp), actual Ethiopian payment gateway integrations (Telebirr/CBE Pay/M-Pesa/
-Amole — currently just selectable payment *methods*, not live merchant integrations),
-the Ethiopian calendar UI, purchase requests/approvals workflow, sales-order→invoice
-conversion (invoices are still created independently of an order for now), receipt
-printing / physical cash-drawer / barcode-scanner hardware integration, offline-mode
-sync for POS, period-end closing entries and perpetual COGS posting (see the
-Accounting simplifications noted above), and SaaS platform-admin screens are not
-implemented yet.
+Beyond the sales/top-products/valuation/dead-stock reports and the three accounting
+reports, there's no purchase-trend report, no ABC analysis, no custom report builder,
+and no export to Excel/CSV/PDF. Also not built: AI features (demand forecasting,
+anomaly detection, reorder suggestions), customer/supplier portals, notifications
+(SMS/email/push/WhatsApp), actual Ethiopian payment gateway integrations (Telebirr/
+CBE Pay/M-Pesa/Amole — currently just selectable payment *methods*, not live merchant
+integrations), the Ethiopian calendar UI, purchase requests/approvals workflow,
+sales-order→invoice conversion (invoices are still created independently of an order
+for now), receipt printing / physical cash-drawer / barcode-scanner hardware
+integration, offline-mode sync for POS, period-end closing entries and perpetual COGS
+posting (see the Accounting simplifications noted above), and SaaS platform-admin
+screens.
