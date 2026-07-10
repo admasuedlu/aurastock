@@ -26,6 +26,89 @@ class SalesSummary {
   final List<SalesTrendPoint> series;
 }
 
+/// Goods-receipt-based purchase trend; same shape as [SalesSummary] so the
+/// UI can render both with one widget.
+class PurchaseSummary {
+  PurchaseSummary({required this.todayTotal, required this.monthTotal, required this.periodTotal, required this.series});
+
+  factory PurchaseSummary.fromJson(Map<String, dynamic> json) {
+    return PurchaseSummary(
+      todayTotal: double.tryParse(json['today_total'].toString()) ?? 0,
+      monthTotal: double.tryParse(json['month_total'].toString()) ?? 0,
+      periodTotal: double.tryParse(json['period_total'].toString()) ?? 0,
+      series: (json['series'] as List).map((e) => SalesTrendPoint.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  final double todayTotal;
+  final double monthTotal;
+  final double periodTotal;
+  final List<SalesTrendPoint> series;
+}
+
+class AbcClassSummary {
+  AbcClassSummary({required this.abcClass, required this.productCount, required this.revenue, required this.revenuePct});
+
+  factory AbcClassSummary.fromJson(Map<String, dynamic> json) {
+    return AbcClassSummary(
+      abcClass: json['abc_class'] as String,
+      productCount: json['product_count'] as int? ?? 0,
+      revenue: double.tryParse(json['revenue'].toString()) ?? 0,
+      revenuePct: double.tryParse(json['revenue_pct'].toString()) ?? 0,
+    );
+  }
+
+  final String abcClass;
+  final int productCount;
+  final double revenue;
+  final double revenuePct;
+}
+
+class AbcRow {
+  AbcRow({
+    required this.productName,
+    required this.productSku,
+    required this.quantitySold,
+    required this.revenue,
+    required this.cumulativePct,
+    required this.abcClass,
+  });
+
+  factory AbcRow.fromJson(Map<String, dynamic> json) {
+    return AbcRow(
+      productName: json['product_name'] as String,
+      productSku: json['product_sku'] as String? ?? '',
+      quantitySold: double.tryParse(json['quantity_sold'].toString()) ?? 0,
+      revenue: double.tryParse(json['revenue'].toString()) ?? 0,
+      cumulativePct: double.tryParse(json['cumulative_pct'].toString()) ?? 0,
+      abcClass: json['abc_class'] as String,
+    );
+  }
+
+  final String productName;
+  final String productSku;
+  final double quantitySold;
+  final double revenue;
+  final double cumulativePct;
+  final String abcClass;
+}
+
+class AbcAnalysis {
+  AbcAnalysis({required this.totalRevenue, required this.summary, required this.rows});
+
+  factory AbcAnalysis.fromJson(Map<String, dynamic> json) {
+    return AbcAnalysis(
+      totalRevenue: double.tryParse(json['total_revenue'].toString()) ?? 0,
+      summary: (json['summary'] as List).map((e) => AbcClassSummary.fromJson(e as Map<String, dynamic>)).toList(),
+      rows: (json['rows'] as List).map((e) => AbcRow.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  final double totalRevenue;
+  final List<AbcClassSummary> summary;
+  final List<AbcRow> rows;
+}
+
 class TopProductRow {
   TopProductRow({required this.productName, required this.productSku, required this.quantitySold, required this.revenue});
 

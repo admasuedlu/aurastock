@@ -11,10 +11,20 @@ class ReportsRepository {
     return SalesSummary.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<PurchaseSummary> fetchPurchaseSummary({int days = 30}) async {
+    final response = await _dio.get('/reports/purchase-summary/', queryParameters: {'days': days});
+    return PurchaseSummary.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<List<TopProductRow>> fetchTopProducts({int limit = 10}) async {
     final response = await _dio.get('/reports/top-products/', queryParameters: {'limit': limit});
     final rows = response.data['rows'] as List;
     return rows.map((e) => TopProductRow.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<AbcAnalysis> fetchAbcAnalysis() async {
+    final response = await _dio.get('/reports/abc-analysis/');
+    return AbcAnalysis.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<InventoryValuation> fetchInventoryValuation() async {

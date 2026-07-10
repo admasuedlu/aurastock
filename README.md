@@ -190,14 +190,23 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   only "everything up to now."
 - Reports: sales summary (today/month/period totals + a daily series, combining
   confirmed-or-later invoices and completed POS transactions — the two things that
-  actually represent a sale), top products by revenue (computed via a DB-level F()
-  expression replicating the line-item discount math, not a Python property, since
-  you can't `Sum()` a `@property`), inventory valuation (`quantity_on_hand *
+  actually represent a sale), purchase summary (the same today/month/period +
+  daily-series shape for the buy side, based on goods receipts valued at cost —
+  the moment goods actually enter the business, mirroring how the sales report
+  counts real sales rather than draft quotations), top products by revenue (computed
+  via a DB-level F() expression replicating the line-item discount math, not a Python
+  property, since you can't `Sum()` a `@property`), ABC analysis (Pareto
+  classification: products ranked by revenue share, then the running cumulative
+  share buckets each into class A / B / C at configurable thresholds — default
+  80% / 95% — reusing the exact same discount-aware revenue expression as
+  top-products so the two never disagree), inventory valuation (`quantity_on_hand *
   average_cost` per product/warehouse, plus totals), and dead stock (on-hand
   products with no `stock_out` movement in N days, found via a single grouped query
   rather than one query per product). All hand-verified against seeded data with
   known-correct expected numbers (e.g. a product sold 5 via invoice + 3 via POS
-  shows quantity_sold=8, revenue=8×price).
+  shows quantity_sold=8, revenue=8×price; an 800/150/50 revenue split lands one
+  product each in A/B/C with cumulative shares of exactly 80% / 95% / 100%; a goods
+  receipt of 100×60 + 50×40 reports a purchase total of 8000).
 - AI Insights: reorder suggestions (suggested quantity = 30-day actual sales
   velocity × a 7-day lead time + safety stock − what's available, only for products
   at or below their reorder point — not an arbitrary guess), demand forecasting
@@ -335,9 +344,9 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 
 ## Known gaps (not yet built)
 
-Beyond the sales/top-products/valuation/dead-stock reports and the three accounting
-reports, there's no purchase-trend report, no ABC analysis, no custom report builder,
-and no export to Excel/CSV/PDF. The AI insights are honest statistics on real data, not
+Beyond the sales/purchase/top-products/ABC/valuation/dead-stock reports and the three
+accounting reports, there's no custom report builder and no export to Excel/CSV/PDF.
+The AI insights are honest statistics on real data, not
 a "customer purchase prediction" or "intelligent dashboard" in the fuller sense of the
 original spec. Notifications only fire from `stock_out()`, not from `adjust_stock()` or
 `transfer_stock()`, so a manual stock adjustment or transfer that drops a product below
