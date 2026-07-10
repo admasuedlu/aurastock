@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Sum
 
 from apps.core.numbering import next_value
 
@@ -66,7 +67,7 @@ def create_journal_entry(*, company, lines, description="", reference="", source
     return entry
 
 
-def record_invoice_confirmed(invoice) -> JournalEntry:
+def record_invoice_confirmed(invoice, cogs_amount: Decimal = Decimal("0")) -> JournalEntry:
     accounts = _get_accounts(invoice.company)
     lines = [
         {"account": accounts["1100"], "debit": invoice.total, "description": invoice.number},
@@ -74,6 +75,12 @@ def record_invoice_confirmed(invoice) -> JournalEntry:
     ]
     if invoice.tax_total:
         lines.append({"account": accounts["2100"], "credit": invoice.tax_total, "description": "VAT"})
+    if cogs_amount:
+        # Perpetual inventory: the same moment revenue is recognized, the
+        # goods' cost basis (from stock_out's weighted-average at time of
+        # deduction) moves out of Inventory and into COGS.
+        lines.append({"account": accounts["5000"], "debit": cogs_amount, "description": f"COGS {invoice.number}"})
+        lines.append({"account": accounts["1200"], "credit": cogs_amount, "description": f"COGS {invoice.number}"})
     return create_journal_entry(
         company=invoice.company, lines=lines, description=f"Invoice {invoice.number} confirmed",
         reference=invoice.number, source=JournalEntry.Source.INVOICE, user=invoice.created_by,
@@ -124,7 +131,7 @@ def record_purchase_payment(payment, order) -> JournalEntry:
     )
 
 
-def record_pos_sale(pos_transaction) -> JournalEntry:
+def record_pos_sale(pos_transaction, cogs_amount: Decimal = Decimal("0")) -> JournalEntry:
     accounts = _get_accounts(pos_transaction.company)
     cash_or_bank = accounts[_cash_or_bank_code(pos_transaction.payment_method)]
     lines = [
@@ -133,13 +140,16 @@ def record_pos_sale(pos_transaction) -> JournalEntry:
     ]
     if pos_transaction.tax_total:
         lines.append({"account": accounts["2100"], "credit": pos_transaction.tax_total, "description": "VAT"})
+    if cogs_amount:
+        lines.append({"account": accounts["5000"], "debit": cogs_amount, "description": f"COGS {pos_transaction.number}"})
+        lines.append({"account": accounts["1200"], "credit": cogs_amount, "description": f"COGS {pos_transaction.number}"})
     return create_journal_entry(
         company=pos_transaction.company, lines=lines, description=f"POS sale {pos_transaction.number}",
         reference=pos_transaction.number, source=JournalEntry.Source.POS_SALE, user=pos_transaction.created_by,
     )
 
 
-def record_pos_refund(pos_transaction, user=None) -> JournalEntry:
+def record_pos_refund(pos_transaction, user=None, cogs_amount: Decimal = Decimal("0")) -> JournalEntry:
     accounts = _get_accounts(pos_transaction.company)
     cash_or_bank = accounts[_cash_or_bank_code(pos_transaction.payment_method)]
     lines = [
@@ -148,6 +158,11 @@ def record_pos_refund(pos_transaction, user=None) -> JournalEntry:
     ]
     if pos_transaction.tax_total:
         lines.append({"account": accounts["2100"], "debit": pos_transaction.tax_total, "description": "VAT reversal"})
+    if cogs_amount:
+        # Mirrors the sale's COGS lines: the stock the refund view just put
+        # back (at its original cost basis) moves back from COGS to Inventory.
+        lines.append({"account": accounts["1200"], "debit": cogs_amount, "description": f"COGS reversal {pos_transaction.number}"})
+        lines.append({"account": accounts["5000"], "credit": cogs_amount, "description": f"COGS reversal {pos_transaction.number}"})
     return create_journal_entry(
         company=pos_transaction.company, lines=lines, description=f"POS refund {pos_transaction.number}",
         reference=pos_transaction.number, source=JournalEntry.Source.POS_REFUND, user=user,
@@ -168,3 +183,52 @@ def record_expense(expense: Expense) -> JournalEntry:
     expense.journal_entry = entry
     expense.save(update_fields=["journal_entry"])
     return entry
+
+
+def close_accounting_period(*, company, user=None) -> JournalEntry | None:
+    """Zeroes out every Income/Expense account into Retained Earnings.
+
+    Deliberately period-less rather than tracking fiscal periods: a prior
+    close already zeroed out whatever activity came before it (its own
+    zeroing lines landed on these same accounts), so summing all-time
+    activity on an Income/Expense account is exactly "activity since the
+    last close" whether that was yesterday or never. Returns None if there's
+    nothing to close (e.g. called twice in a row with no activity between).
+    """
+    accounts = Account.objects.filter(
+        company=company, is_active=True,
+        account_type__in=[Account.AccountType.INCOME, Account.AccountType.EXPENSE],
+    )
+    sums = (
+        JournalEntryLine.objects.filter(company=company, account__in=accounts)
+        .values("account").annotate(debit_sum=Sum("debit"), credit_sum=Sum("credit"))
+    )
+    sums_by_account = {row["account"]: (row["debit_sum"] or Decimal("0"), row["credit_sum"] or Decimal("0")) for row in sums}
+
+    lines = []
+    net_income = Decimal("0")
+    for account in accounts:
+        debit_sum, credit_sum = sums_by_account.get(account.id, (Decimal("0"), Decimal("0")))
+        balance = debit_sum - credit_sum if account.is_debit_normal else credit_sum - debit_sum
+        if not balance:
+            continue
+        if account.account_type == Account.AccountType.INCOME:
+            lines.append({"account": account, "debit": balance, "description": "Period close"})
+            net_income += balance
+        else:
+            lines.append({"account": account, "credit": balance, "description": "Period close"})
+            net_income -= balance
+
+    if not lines:
+        return None
+
+    retained_earnings = Account.objects.get(company=company, code="3100")
+    if net_income > 0:
+        lines.append({"account": retained_earnings, "credit": net_income, "description": "Net income to retained earnings"})
+    elif net_income < 0:
+        lines.append({"account": retained_earnings, "debit": -net_income, "description": "Net loss to retained earnings"})
+
+    return create_journal_entry(
+        company=company, lines=lines, description="Period-end close",
+        source=JournalEntry.Source.CLOSING, user=user,
+    )

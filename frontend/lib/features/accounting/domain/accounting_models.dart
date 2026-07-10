@@ -151,4 +151,23 @@ class BalanceSheet {
   final double totalAssets;
   final double totalLiabilities;
   final double totalEquity;
+
+  bool get isBalanced => (totalAssets - (totalLiabilities + totalEquity)).abs() < 0.01;
+}
+
+class ClosePeriodResult {
+  ClosePeriodResult({required this.closed, required this.detail});
+
+  factory ClosePeriodResult.fromJson(Map<String, dynamic> json) {
+    final entry = json['journal_entry'] as Map<String, dynamic>?;
+    return ClosePeriodResult(
+      closed: json['closed'] as bool,
+      detail: entry != null
+          ? 'Closed as ${entry['number']}.'
+          : (json['detail'] as String? ?? 'Nothing to close.'),
+    );
+  }
+
+  final bool closed;
+  final String detail;
 }

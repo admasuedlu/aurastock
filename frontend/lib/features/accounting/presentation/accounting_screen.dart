@@ -196,8 +196,15 @@ class _ProfitAndLossTab extends ConsumerWidget {
   }
 }
 
-class _BalanceSheetTab extends ConsumerWidget {
+class _BalanceSheetTab extends ConsumerStatefulWidget {
   const _BalanceSheetTab();
+
+  @override
+  ConsumerState<_BalanceSheetTab> createState() => _BalanceSheetTabState();
+}
+
+class _BalanceSheetTabState extends ConsumerState<_BalanceSheetTab> {
+  bool _closing = false;
 
   Widget _section(BuildContext context, String title, List<LedgerAmountRow> rows, double total, NumberFormat currency) {
     return Column(
@@ -223,8 +230,25 @@ class _BalanceSheetTab extends ConsumerWidget {
     );
   }
 
+  Future<void> _closePeriod() async {
+    setState(() => _closing = true);
+    try {
+      final result = await ref.read(accountingRepositoryProvider).closePeriod();
+      ref.invalidate(balanceSheetProvider);
+      ref.invalidate(trialBalanceProvider);
+      ref.invalidate(profitAndLossProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.detail)));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _closing = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final balanceSheetAsync = ref.watch(balanceSheetProvider);
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
@@ -239,11 +263,34 @@ class _BalanceSheetTab extends ConsumerWidget {
             _section(context, 'Assets', sheet.assets, sheet.totalAssets, currency),
             _section(context, 'Liabilities', sheet.liabilities, sheet.totalLiabilities, currency),
             _section(context, 'Equity', sheet.equity, sheet.totalEquity, currency),
-            Text(
-              'Note: current-period net income is not yet rolled into Retained '
-              'Earnings via a closing entry, so Assets may not equal Liabilities + Equity.',
-              style: Theme.of(context).textTheme.bodySmall,
+            Card(
+              color: sheet.isBalanced
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.orange.withValues(alpha: 0.1),
+              child: ListTile(
+                leading: Icon(
+                  sheet.isBalanced ? Icons.check_circle_outline : Icons.info_outline,
+                  color: sheet.isBalanced ? Colors.green : Colors.orange,
+                ),
+                title: Text(sheet.isBalanced ? 'Assets = Liabilities + Equity' : 'Assets ≠ Liabilities + Equity'),
+                subtitle: Text(
+                  sheet.isBalanced
+                      ? 'Books are closed through today.'
+                      : 'Current-period net income is still sitting in Income/Expense '
+                        'accounts. Close the period to roll it into Retained Earnings.',
+                ),
+              ),
             ),
+            if (!sheet.isBalanced) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _closing ? null : _closePeriod,
+                icon: _closing
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.lock_clock_outlined),
+                label: const Text('Close Period'),
+              ),
+            ],
           ],
         );
       },

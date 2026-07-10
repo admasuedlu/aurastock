@@ -102,9 +102,10 @@ class InvoiceViewSet(CompanyScopedViewSet):
         if invoice.status != Invoice.Status.DRAFT:
             raise DRFValidationError("Only draft invoices can be confirmed.")
 
+        cogs_amount = Decimal("0")
         try:
             for item in invoice.items.select_related("product", "variant").all():
-                stock_out(
+                movement = stock_out(
                     company=invoice.company,
                     warehouse=invoice.warehouse,
                     product=item.product,
@@ -114,12 +115,13 @@ class InvoiceViewSet(CompanyScopedViewSet):
                     reason="Invoice confirmed",
                     user=request.user,
                 )
+                cogs_amount += movement.quantity * movement.unit_cost
         except DjangoValidationError as exc:
             raise DRFValidationError(exc.messages if hasattr(exc, "messages") else str(exc))
 
         invoice.status = Invoice.Status.CONFIRMED
         invoice.save(update_fields=["status", "updated_at"])
-        accounting_services.record_invoice_confirmed(invoice)
+        accounting_services.record_invoice_confirmed(invoice, cogs_amount=cogs_amount)
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=True, methods=["post"], url_path="record-payment")

@@ -52,4 +52,9 @@ class AccountingRepository {
     final response = await _dio.get('/accounting/reports/balance-sheet/');
     return BalanceSheet.fromJson(response.data as Map<String, dynamic>);
   }
+
+  Future<ClosePeriodResult> closePeriod() async {
+    final response = await _dio.post('/accounting/close-period/');
+    return ClosePeriodResult.fromJson(response.data as Map<String, dynamic>);
+  }
 }

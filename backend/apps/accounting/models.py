@@ -50,6 +50,7 @@ class JournalEntry(CompanyScopedModel):
         POS_SALE = "pos_sale", "POS sale"
         POS_REFUND = "pos_refund", "POS refund"
         EXPENSE = "expense", "Expense"
+        CLOSING = "closing", "Period closing"
 
     number = models.CharField(max_length=30)
     entry_date = models.DateField(auto_now_add=True)

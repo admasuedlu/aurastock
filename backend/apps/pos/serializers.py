@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -71,11 +73,13 @@ class POSTransactionSerializer(serializers.ModelSerializer):
         pos_transaction.recalculate_totals(items)
         pos_transaction.save(update_fields=["subtotal", "discount_total", "tax_total", "total"])
 
+        cogs_amount = Decimal("0")
         for item in items:
-            stock_out(
+            movement = stock_out(
                 company=company, warehouse=session.warehouse, product=item.product, variant=item.variant,
                 quantity=item.quantity, reference=pos_transaction.number, reason="POS sale", user=user,
             )
+            cogs_amount += movement.quantity * movement.unit_cost
 
-        accounting_services.record_pos_sale(pos_transaction)
+        accounting_services.record_pos_sale(pos_transaction, cogs_amount=cogs_amount)
         return pos_transaction

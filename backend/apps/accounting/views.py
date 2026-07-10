@@ -1,4 +1,6 @@
 from rest_framework import mixins, permissions, viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.core.viewsets import CompanyScopedViewSet
 
@@ -45,3 +47,19 @@ class ExpenseViewSet(CompanyScopedViewSet):
     def perform_create(self, serializer):
         expense = serializer.save(company=self.request.user.company, created_by=self.request.user)
         services.record_expense(expense)
+
+
+class ClosePeriodView(APIView):
+    """Zeroes out Income/Expense accounts into Retained Earnings so the
+    balance sheet actually balances (Assets = Liabilities + Equity) going
+    forward. Simulates what a real close-the-books action would be -- there's
+    no fiscal-period model, so this always closes all activity since the
+    last close (see services.close_accounting_period)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        entry = services.close_accounting_period(company=request.user.company, user=request.user)
+        if entry is None:
+            return Response({"closed": False, "detail": "Nothing to close -- no income or expense activity since the last close."})
+        return Response({"closed": True, "journal_entry": JournalEntrySerializer(entry).data})

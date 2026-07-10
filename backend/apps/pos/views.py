@@ -76,6 +76,7 @@ class POSTransactionViewSet(CompanyScopedViewSet):
         if pos_transaction.status != POSTransaction.Status.COMPLETED:
             raise DRFValidationError("Only completed transactions can be refunded.")
 
+        cogs_amount = Decimal("0")
         for item in pos_transaction.items.select_related("product", "variant").all():
             original_movement = StockMovement.objects.filter(
                 company=pos_transaction.company, reference=pos_transaction.number,
@@ -85,6 +86,7 @@ class POSTransactionViewSet(CompanyScopedViewSet):
             # Restore stock at the cost basis it left at, not today's average, so
             # refunding a sale doesn't dilute the remaining stock's average cost.
             unit_cost = original_movement.unit_cost if original_movement else Decimal("0")
+            cogs_amount += item.quantity * unit_cost
 
             stock_in(
                 company=pos_transaction.company, warehouse=pos_transaction.session.warehouse,
@@ -95,5 +97,5 @@ class POSTransactionViewSet(CompanyScopedViewSet):
 
         pos_transaction.status = POSTransaction.Status.REFUNDED
         pos_transaction.save(update_fields=["status", "updated_at"])
-        accounting_services.record_pos_refund(pos_transaction, user=request.user)
+        accounting_services.record_pos_refund(pos_transaction, user=request.user, cogs_amount=cogs_amount)
         return Response(POSTransactionSerializer(pos_transaction).data)

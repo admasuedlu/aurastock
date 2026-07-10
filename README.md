@@ -36,6 +36,13 @@ model's company-wide row visibility — giving customers read access to their
 sent quotations (with accept/reject), orders, and invoices, and suppliers
 read access to their sent purchase orders (with acknowledge), all wired back
 into the Phase 7 notification pipeline so staff hear about portal actions.
+**Accounting correctness (closing Phase 4's known gap):** perpetual COGS
+posting on every sale (invoice confirm and POS checkout each post Dr COGS /
+Cr Inventory alongside the revenue entry, sourced from the same
+weighted-average cost `stock_out()` already computes) and a period-end
+closing action that rolls Income/Expense balances into Retained Earnings, so
+the balance sheet actually balances instead of permanently sitting net
+income in temporary accounts.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -135,22 +142,45 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   Receivable, Inventory, VAT Receivable, Accounts Payable, VAT Payable, Withholding
   Tax Payable, Owner's Equity, Retained Earnings, Sales Revenue, COGS, Operating
   Expenses) seeded on signup. Every one of the following posts a balanced journal
-  entry automatically: invoice confirmed (Dr AR / Cr Revenue + VAT Payable), sales
-  payment (Dr Cash-or-Bank / Cr AR), goods receipt (Dr Inventory + VAT Receivable /
-  Cr AP — booked tax-inclusive so it nets to zero against a later full PO payment),
-  PO payment (Dr AP / Cr Cash-or-Bank), POS sale and refund (mirrored pairs), and
-  manual expenses (Dr Operating Expenses / Cr Cash-or-Bank). `create_journal_entry`
-  rejects any set of lines that doesn't balance, so an unbalanced entry simply
-  can't be persisted. Trial balance, P&L, and balance sheet report endpoints read
-  straight off the ledger. Verified end-to-end via curl: a full
-  PO→receive→pay→sell→POS-sale→POS-refund→expense sequence produces a trial balance
-  where total debits exactly equal total credits. Known simplification: there's no
-  period-end closing entry yet, so current-period net income sits in the Income/
-  Expense accounts rather than being rolled into Retained Earnings — the balance
-  sheet endpoint documents this (Assets won't equal Liabilities + Equity until that
-  exists), and COGS is never posted (no perpetual cost-of-goods-sold entry on sale),
-  so P&L net income is currently gross margin minus operating expenses, not true
-  net income.
+  entry automatically: invoice confirmed (Dr AR / Cr Revenue + VAT Payable, **plus
+  Dr COGS / Cr Inventory** for the stock's cost basis), sales payment (Dr
+  Cash-or-Bank / Cr AR), goods receipt (Dr Inventory + VAT Receivable / Cr AP —
+  booked tax-inclusive so it nets to zero against a later full PO payment), PO
+  payment (Dr AP / Cr Cash-or-Bank), POS sale and refund (mirrored pairs,
+  **each including the matching COGS/Inventory pair**), and manual expenses (Dr
+  Operating Expenses / Cr Cash-or-Bank). COGS is real, perpetual, and comes
+  from the same place the stock deduction already does: `stock_out()` returns
+  the `StockMovement` it just created, whose `unit_cost` is the weighted-average
+  cost *at the moment of deduction* — the invoice-confirm and POS-checkout call
+  sites sum `quantity × unit_cost` across their line items and pass that total
+  straight into the journal-entry recorder, so there's no separate costing
+  pass to keep in sync. A POS refund reverses it by the same amount the stock
+  actually came back in at (see the refund cost-basis note below), not
+  today's average. `create_journal_entry` rejects any set of lines that
+  doesn't balance, so an unbalanced entry simply can't be persisted. Trial
+  balance, P&L, and balance sheet report endpoints read straight off the
+  ledger — P&L's Expenses section now shows a real Cost of Goods Sold line
+  instead of a permanent zero. Period-end closing is a deliberate action,
+  `POST /accounting/close-period/`, not automatic on a schedule: it zeroes
+  every Income/Expense account into Retained Earnings and is intentionally
+  period-*less* rather than backed by a fiscal-period model — a prior close's
+  own zeroing lines already net out everything before it, so summing an
+  account's all-time activity is exactly "since the last close," whether that
+  was yesterday or never; calling it again with nothing new to close is a
+  no-op (`{"closed": false}`, not an error). The Flutter Balance Sheet tab
+  surfaces this directly: an "Assets ≠ Liabilities + Equity" card with a
+  **Close Period** button when unclosed, replaced by a green "books are
+  closed through today" card once they match. Verified end-to-end via curl
+  with hand-derived expected numbers, not just "did it balance": a
+  PO→receive(cost 60)→invoice 10 units→confirm→POS-sell 5 units→POS-refund
+  sequence posted COGS of exactly 600.00 / 300.00 / -300.00 on those three
+  entries; the balance sheet was off by exactly 400.00 (=1000 revenue − 600
+  COGS, the two POS legs net to zero) before closing and exactly equal after;
+  Retained Earnings was credited exactly 400.00; a second close returned
+  `closed: false`; the trial balance stayed balanced throughout. Known
+  simplification: closing entries land on "today" rather than a
+  user-chosen period end, so there's no way to close out, say, just June —
+  only "everything up to now."
 - Reports: sales summary (today/month/period totals + a daily series, combining
   confirmed-or-later invoices and completed POS transactions — the two things that
   actually represent a sale), top products by revenue (computed via a DB-level F()
@@ -311,10 +341,11 @@ gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectabl
 *methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
 requests/approvals workflow, sales-order→invoice conversion (invoices are still created
 independently of an order for now), receipt printing / physical cash-drawer /
-barcode-scanner hardware integration, offline-mode sync for POS, period-end closing
-entries and perpetual COGS posting (see the Accounting simplifications noted above),
-and a real Celery beat schedule (the overdue-invoice scan is a POST endpoint that
-simulates one, not an actual periodic task). The platform-admin layer manages
+barcode-scanner hardware integration, offline-mode sync for POS, closing to a
+user-chosen fiscal period end rather than always "everything up to now" (see
+the Accounting note above), and a real Celery beat schedule (the
+overdue-invoice scan is a POST endpoint that simulates one, not an actual
+periodic task). The platform-admin layer manages
 subscriptions but doesn't *bill* them — there's no payment collection, invoice
 generation for the SaaS fee, or automatic suspension on non-payment (that's the
 same missing-payment-gateway problem as the tenant-facing Telebirr integration);

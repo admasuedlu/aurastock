@@ -99,11 +99,11 @@ class ProfitAndLossView(APIView):
 
 
 class BalanceSheetView(APIView):
-    """Assets/Liabilities/Equity as of a date. Note: this does not run a
-    period-end close, so current-period net income sits implicitly in the
-    Income/Expense accounts rather than being rolled into Retained Earnings
-    -- assets will not equal liabilities + equity until a closing entry
-    moves that net income across. That closing step isn't implemented yet."""
+    """Assets/Liabilities/Equity as of a date. Until POST
+    /accounting/close-period/ is called, current-period net income sits
+    implicitly in the Income/Expense accounts rather than being rolled into
+    Retained Earnings, so assets won't equal liabilities + equity -- there's
+    no automatic close (e.g. on a schedule), it's a deliberate action."""
 
     permission_classes = [IsAuthenticated]
 
