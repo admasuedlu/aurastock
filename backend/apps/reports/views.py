@@ -14,6 +14,8 @@ from apps.products.models import Product
 from apps.purchasing.models import GoodsReceiptItem
 from apps.sales.models import Invoice, InvoiceItem
 
+from .exporters import maybe_csv
+
 _SALE_INVOICE_STATUSES = [Invoice.Status.CONFIRMED, Invoice.Status.PARTIALLY_PAID, Invoice.Status.PAID]
 
 _MONEY_FIELD = DecimalField(max_digits=14, decimal_places=2)
@@ -73,6 +75,10 @@ class SalesSummaryView(APIView):
         month_start = today.replace(day=1)
         month_total = sum((amount for d, amount in daily.items() if d >= month_start), Decimal("0"))
 
+        export = maybe_csv(request, "sales-summary.csv", [("date", "Date"), ("total", "Total")], series)
+        if export is not None:
+            return export
+
         return Response({
             "today_total": today_total,
             "month_total": month_total,
@@ -122,6 +128,12 @@ class TopProductsView(APIView):
             }
             for pid, data in top
         ]
+        export = maybe_csv(request, "top-products.csv", [
+            ("product_name", "Product"), ("product_sku", "SKU"),
+            ("quantity_sold", "Qty sold"), ("revenue", "Revenue"),
+        ], rows)
+        if export is not None:
+            return export
         return Response({"start": start.isoformat(), "end": end.isoformat(), "rows": rows})
 
 
@@ -150,6 +162,13 @@ class InventoryValuationView(APIView):
             })
 
         rows.sort(key=lambda r: r["value"], reverse=True)
+        # CSV export is the whole valuation, not the top-50 the JSON view trims to.
+        export = maybe_csv(request, "inventory-valuation.csv", [
+            ("product_name", "Product"), ("product_sku", "SKU"), ("warehouse_name", "Warehouse"),
+            ("quantity_on_hand", "On hand"), ("average_cost", "Avg cost"), ("value", "Value"),
+        ], rows)
+        if export is not None:
+            return export
         return Response({
             "total_value": total_value,
             "by_warehouse": [{"warehouse_name": name, "value": value} for name, value in by_warehouse.items()],
@@ -193,6 +212,12 @@ class DeadStockView(APIView):
             })
 
         rows.sort(key=lambda r: r["value"], reverse=True)
+        export = maybe_csv(request, "dead-stock.csv", [
+            ("product_name", "Product"), ("product_sku", "SKU"), ("warehouse_name", "Warehouse"),
+            ("quantity_on_hand", "On hand"), ("value", "Value"), ("last_sold_at", "Last sold"),
+        ], rows)
+        if export is not None:
+            return export
         return Response({"days": days, "rows": rows})
 
 
@@ -228,6 +253,9 @@ class PurchaseSummaryView(APIView):
         ]
 
         month_start = today.replace(day=1)
+        export = maybe_csv(request, "purchase-summary.csv", [("date", "Date"), ("total", "Total")], series)
+        if export is not None:
+            return export
         return Response({
             "today_total": _q2(daily.get(today, Decimal("0"))),
             "month_total": _q2(sum((amt for d, amt in daily.items() if d >= month_start), Decimal("0"))),
@@ -308,6 +336,12 @@ class AbcAnalysisView(APIView):
             }
             for c in ("A", "B", "C")
         ]
+        export = maybe_csv(request, "abc-analysis.csv", [
+            ("abc_class", "Class"), ("product_name", "Product"), ("product_sku", "SKU"),
+            ("quantity_sold", "Qty sold"), ("revenue", "Revenue"), ("cumulative_pct", "Cumulative %"),
+        ], rows)
+        if export is not None:
+            return export
         return Response({
             "start": start.isoformat(), "end": end.isoformat(),
             "a_threshold": a_threshold, "b_threshold": b_threshold,

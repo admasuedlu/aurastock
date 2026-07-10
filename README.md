@@ -206,7 +206,17 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   known-correct expected numbers (e.g. a product sold 5 via invoice + 3 via POS
   shows quantity_sold=8, revenue=8×price; an 800/150/50 revenue split lands one
   product each in A/B/C with cumulative shares of exactly 80% / 95% / 100%; a goods
-  receipt of 100×60 + 50×40 reports a purchase total of 8000).
+  receipt of 100×60 + 50×40 reports a purchase total of 8000). Every one of these
+  six reports also exports to CSV: add `?export=csv` and the same endpoint returns
+  a downloadable `text/csv` attachment (correct `Content-Disposition` filename per
+  report) instead of JSON, via one shared exporter that maps each report's rows to
+  labelled columns — verified via curl (headers, header row, and data rows all
+  checked; valuation exports the full list rather than the top-50 the JSON view
+  trims to). The `export` query param is used rather than DRF's reserved `format`.
+  Note: this is API-level export — any HTTP client can pull it — but there's no
+  in-app download button in the Flutter reports screen yet (a correct one is
+  platform-specific — a web Blob/anchor plus an IO fallback — and couldn't be
+  machine-verified in this environment, so it wasn't shipped blind).
 - AI Insights: reorder suggestions (suggested quantity = 30-day actual sales
   velocity × a 7-day lead time + safety stock − what's available, only for products
   at or below their reorder point — not an arbitrary guess), demand forecasting
@@ -345,8 +355,9 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 ## Known gaps (not yet built)
 
 Beyond the sales/purchase/top-products/ABC/valuation/dead-stock reports and the three
-accounting reports, there's no custom report builder and no export to Excel/CSV/PDF.
-The AI insights are honest statistics on real data, not
+accounting reports, there's no custom report builder; report data exports to CSV at the
+API level (`?export=csv`) but there's no in-app download button yet and no Excel/PDF
+export. The AI insights are honest statistics on real data, not
 a "customer purchase prediction" or "intelligent dashboard" in the fuller sense of the
 original spec. Notifications only fire from `stock_out()`, not from `adjust_stock()` or
 `transfer_stock()`, so a manual stock adjustment or transfer that drops a product below
