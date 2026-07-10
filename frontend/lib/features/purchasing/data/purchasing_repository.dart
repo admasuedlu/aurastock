@@ -27,6 +27,11 @@ class PurchasingRepository {
     return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<PurchaseOrder> sendPurchaseOrder(String purchaseOrderId) async {
+    final response = await _dio.post('/purchase-orders/$purchaseOrderId/send/');
+    return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<void> receiveGoods({
     required String purchaseOrderId,
     required String warehouseId,

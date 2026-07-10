@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../portal/presentation/portal_access_dialog.dart';
 import '../../suppliers/presentation/supplier_form_sheet.dart';
 import '../../suppliers/providers/supplier_providers.dart';
 import '../providers/purchasing_providers.dart';
@@ -104,7 +105,22 @@ class _PurchasingScreenState extends ConsumerState<PurchasingScreen> {
                         leading: CircleAvatar(child: Text(supplier.name.isNotEmpty ? supplier.name[0] : '?')),
                         title: Text(supplier.name),
                         subtitle: Text(supplier.phone.isNotEmpty ? supplier.phone : supplier.email),
-                        trailing: Text('Net ${supplier.paymentTermsDays}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Net ${supplier.paymentTermsDays}'),
+                            IconButton(
+                              icon: const Icon(Icons.vpn_key_outlined),
+                              tooltip: 'Portal access',
+                              onPressed: () => showPortalAccessDialog(
+                                context,
+                                resource: 'suppliers',
+                                id: supplier.id,
+                                name: supplier.name,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

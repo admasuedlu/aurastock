@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../customers/presentation/customer_form_sheet.dart';
 import '../../customers/providers/customer_providers.dart';
+import '../../portal/presentation/portal_access_dialog.dart';
 import '../providers/sales_providers.dart';
 import 'create_invoice_sheet.dart';
 import 'create_quotation_sheet.dart';
@@ -190,6 +191,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                         leading: CircleAvatar(child: Text(customer.name.isNotEmpty ? customer.name[0] : '?')),
                         title: Text(customer.name),
                         subtitle: Text(customer.phone.isNotEmpty ? customer.phone : customer.email),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.vpn_key_outlined),
+                          tooltip: 'Portal access',
+                          onPressed: () => showPortalAccessDialog(
+                            context,
+                            resource: 'customers',
+                            id: customer.id,
+                            name: customer.name,
+                          ),
+                        ),
                       ),
                     );
                   },

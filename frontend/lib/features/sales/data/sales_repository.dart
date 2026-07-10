@@ -21,6 +21,11 @@ class SalesRepository {
     return Quotation.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<Quotation> sendQuotation(String quotationId) async {
+    final response = await _dio.post('/quotations/$quotationId/send/');
+    return Quotation.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<SalesOrder> convertQuotationToOrder(String quotationId) async {
     final response = await _dio.post('/quotations/$quotationId/convert-to-order/');
     return SalesOrder.fromJson(response.data as Map<String, dynamic>);

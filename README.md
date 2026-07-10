@@ -29,7 +29,13 @@ platform admin):** a platform-operator layer on top of the tenants — tenant li
 live usage counts, suspend/reactivate that actually locks the tenant out (token
 issuance, API access, and WebSockets, not just a status flag), subscription plan
 management, and real plan-limit enforcement (users/branches/warehouses) at the
-creation choke points.
+creation choke points. **Phase 9 (customer/supplier portals):** a separate,
+non-staff login for external customers and suppliers — signed, expiring tokens
+rather than JWTs, since a portal contact modeled as a `User` would inherit that
+model's company-wide row visibility — giving customers read access to their
+sent quotations (with accept/reject), orders, and invoices, and suppliers
+read access to their sent purchase orders (with acknowledge), all wired back
+into the Phase 7 notification pipeline so staff hear about portal actions.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -246,6 +252,49 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   company list with search/status chips/suspend/change-plan actions, plan
   editor) — tenant users are hard-redirected away from it and platform staff
   can't wander into tenant screens that assume a company.
+- Customer/supplier portal: a `PortalAccount` model that is deliberately **not**
+  a `User` — a `User`'s `company` FK is what every staff viewset trusts for row
+  visibility, so a customer modeled as a `User` would see the entire tenant's
+  data. Portal users authenticate with their own signed, expiring token
+  (`Authorization: Portal <token>`, Django `signing`, 12h) via `POST
+  /portal/login/`, so staff endpoints reject them by construction (a portal
+  token doesn't match the `Bearer` scheme `TenantAwareJWTAuthentication`
+  expects). Staff open access from a key-icon action on the customer/supplier
+  list (`POST/GET/DELETE /customers/{id}/portal-access/`, same shape for
+  suppliers) — scoped to their own tenant since it reuses the same
+  `CompanyScopedViewSet.get_object()` every other action on that viewset
+  does, so a staff member literally cannot target another tenant's customer.
+  This phase also closed a latent Phase 2 gap it made load-bearing: quotations
+  and purchase orders have had a `sent` status since Phase 2, but nothing
+  could ever transition into it — new `POST /quotations/{id}/send/` and
+  `POST /purchase-orders/{id}/send/` staff actions fix that, and they're what
+  gates portal visibility (draft documents stay invisible to the portal).
+  Customers see their sent-or-later quotations (accept/reject, exactly once —
+  a second attempt 400s), sales orders, and confirmed/partially-paid invoices;
+  suppliers see sent-or-later purchase orders (acknowledge, which moves
+  `sent → approved`, the same status the existing goods-receipt flow already
+  expects). Both actions raise a staff notification through the Phase 7
+  pipeline, addressed to the document's creator where known. Verified
+  end-to-end via curl (30 assertions): visibility rules (draft hidden,
+  sent-or-later visible), accept/reject/acknowledge exactly once, every
+  cross-auth combination rejected (portal token on staff endpoints 401; staff
+  JWT on portal endpoints, wrong-role portal token, and an invalid/expired
+  portal token all 403 — authenticated-but-wrong-principal and
+  not-authenticated-at-all are deliberately both closed doors, not just one),
+  and cross-tenant isolation (another tenant's portal customer 404s fetching
+  this tenant's quotation by id, and staff can't grant portal access to
+  another tenant's customer — also a 404, same object-scoping mechanism).
+  Flutter: a portal login reachable from a link on the staff login screen, a
+  portal home (customer: quotations/orders/invoices tabs; supplier: a single
+  purchase-orders view) on its own session store and Dio instance so a portal
+  token is never confused with a staff JWT, and "Mark as Sent" / "Send to
+  Supplier" buttons plus portal-access dialogs wired into the existing
+  quotation/PO action sheets and customer/supplier lists. Written to match
+  existing conventions exactly and reviewed by hand line-by-line (one real
+  bug caught that way: a nullable field read through a non-promoting `if`
+  null-check); the Flutter SDK wasn't available in this environment to run
+  `flutter analyze`/`test`/`build web`, so unlike the backend this hasn't
+  been machine-verified yet.
 
 ## Known gaps (not yet built)
 
@@ -257,7 +306,7 @@ original spec. Notifications only fire from `stock_out()`, not from `adjust_stoc
 `transfer_stock()`, so a manual stock adjustment or transfer that drops a product below
 its reorder level doesn't raise an alert (a human doing that adjustment already sees
 the number they typed); SMS/WhatsApp delivery is architected for but not implemented,
-per the note above. Also not built: customer/supplier portals, actual Ethiopian payment
+per the note above. Also not built: actual Ethiopian payment
 gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
 *methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
 requests/approvals workflow, sales-order→invoice conversion (invoices are still created

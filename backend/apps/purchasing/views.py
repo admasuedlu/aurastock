@@ -18,6 +18,17 @@ class PurchaseOrderViewSet(CompanyScopedViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
 
+    @action(detail=True, methods=["post"])
+    def send(self, request, pk=None):
+        """Marks a draft PO as sent to the supplier -- the transition that
+        makes it visible in the supplier portal (mirrors quotation send)."""
+        order = self.get_object()
+        if order.status != PurchaseOrder.Status.DRAFT:
+            raise DRFValidationError("Only a draft purchase order can be sent.")
+        order.status = PurchaseOrder.Status.SENT
+        order.save(update_fields=["status", "updated_at"])
+        return Response(PurchaseOrderSerializer(order).data)
+
     @action(detail=True, methods=["post"], url_path="record-payment")
     def record_payment(self, request, pk=None):
         order = self.get_object()

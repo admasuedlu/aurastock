@@ -31,6 +31,18 @@ class QuotationViewSet(CompanyScopedViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
 
+    @action(detail=True, methods=["post"])
+    def send(self, request, pk=None):
+        """Marks a draft quotation as sent -- the transition that makes it
+        visible in the customer portal. Quotations have had a `sent` status
+        since Phase 2, but until the portal nothing could move them into it."""
+        quotation = self.get_object()
+        if quotation.status != Quotation.Status.DRAFT:
+            raise DRFValidationError("Only a draft quotation can be sent.")
+        quotation.status = Quotation.Status.SENT
+        quotation.save(update_fields=["status", "updated_at"])
+        return Response(QuotationSerializer(quotation).data)
+
     @action(detail=True, methods=["post"], url_path="convert-to-order")
     @transaction.atomic
     def convert_to_order(self, request, pk=None):

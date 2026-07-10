@@ -3,16 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
-import '../providers/auth_controller.dart';
+import '../providers/portal_providers.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+/// External-facing login for customers and suppliers. Reached from a link on
+/// the staff login screen; a successful login routes to the portal home.
+class PortalLoginScreen extends ConsumerStatefulWidget {
+  const PortalLoginScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<PortalLoginScreen> createState() => _PortalLoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _PortalLoginScreenState extends ConsumerState<PortalLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -27,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(authControllerProvider.notifier).login(
+    await ref.read(portalSessionControllerProvider.notifier).login(
           _emailController.text.trim(),
           _passwordController.text,
         );
@@ -36,13 +38,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final authState = ref.watch(authControllerProvider);
+    final sessionState = ref.watch(portalSessionControllerProvider);
     final scheme = Theme.of(context).colorScheme;
 
-    ref.listen(authControllerProvider, (previous, next) {
+    ref.listen(portalSessionControllerProvider, (previous, next) {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorGeneric)),
+          const SnackBar(content: Text('Invalid email or password.')),
         );
       }
     });
@@ -59,16 +61,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.inventory_2_rounded, size: 56, color: scheme.primary),
+                    Icon(Icons.storefront_outlined, size: 56, color: scheme.primary),
                     const SizedBox(height: 16),
                     Text(
-                      l10n.welcomeBack,
+                      'Customer & Supplier Portal',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      l10n.signInToContinue,
+                      'Sign in to view your quotations, orders and invoices',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                     ),
@@ -95,8 +97,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: authState.isLoading ? null : _submit,
-                      child: authState.isLoading
+                      onPressed: sessionState.isLoading ? null : _submit,
+                      child: sessionState.isLoading
                           ? const SizedBox(
                               height: 20, width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
@@ -105,14 +107,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextButton(
-                      onPressed: () => context.go('/signup'),
-                      child: Text(l10n.noAccount),
-                    ),
-                    const Divider(height: 24),
-                    TextButton.icon(
-                      onPressed: () => context.go('/portal-login'),
-                      icon: const Icon(Icons.storefront_outlined, size: 18),
-                      label: const Text('Customer / Supplier portal'),
+                      onPressed: () => context.go('/login'),
+                      child: const Text('Back to staff sign in'),
                     ),
                   ],
                 ),

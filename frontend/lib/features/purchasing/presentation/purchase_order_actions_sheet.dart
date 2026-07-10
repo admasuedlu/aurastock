@@ -24,6 +24,24 @@ class _PurchaseOrderActionsSheet extends ConsumerStatefulWidget {
 class _PurchaseOrderActionsSheetState extends ConsumerState<_PurchaseOrderActionsSheet> {
   bool _busy = false;
 
+  Future<void> _send() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(purchasingRepositoryProvider).sendPurchaseOrder(widget.order.id);
+      ref.invalidate(purchaseOrderListProvider);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sent — the supplier can now see it in the portal.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _recordPayment() async {
     final controller = TextEditingController(text: widget.order.balanceDue.toStringAsFixed(2));
     final amount = await showDialog<double>(
@@ -64,6 +82,7 @@ class _PurchaseOrderActionsSheetState extends ConsumerState<_PurchaseOrderAction
     final order = widget.order;
     final canReceive = order.status != 'received' && order.status != 'cancelled';
     final canPay = order.balanceDue > 0;
+    final canSend = order.status == 'draft';
 
     return SafeArea(
       child: Padding(
@@ -94,6 +113,15 @@ class _PurchaseOrderActionsSheetState extends ConsumerState<_PurchaseOrderAction
             if (_busy)
               const Center(child: CircularProgressIndicator())
             else ...[
+              if (canSend)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FilledButton.icon(
+                    onPressed: _send,
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Send to Supplier'),
+                  ),
+                ),
               if (canReceive)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),

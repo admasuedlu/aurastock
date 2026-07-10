@@ -25,6 +25,24 @@ class _QuotationActionsSheetState extends ConsumerState<_QuotationActionsSheet> 
 
   static const _nonConvertibleStatuses = {'converted', 'rejected', 'expired'};
 
+  Future<void> _send() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(salesRepositoryProvider).sendQuotation(widget.quotation.id);
+      ref.invalidate(quotationListProvider);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quotation sent — the customer can now see it in the portal.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _convert() async {
     setState(() => _busy = true);
     try {
@@ -49,6 +67,7 @@ class _QuotationActionsSheetState extends ConsumerState<_QuotationActionsSheet> 
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
     final quotation = widget.quotation;
     final canConvert = !_nonConvertibleStatuses.contains(quotation.status);
+    final canSend = quotation.status == 'draft';
 
     return SafeArea(
       child: Padding(
@@ -71,14 +90,25 @@ class _QuotationActionsSheetState extends ConsumerState<_QuotationActionsSheet> 
             const SizedBox(height: 20),
             if (_busy)
               const Center(child: CircularProgressIndicator())
-            else if (canConvert)
-              FilledButton.icon(
-                onPressed: _convert,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Convert to Sales Order'),
-              )
-            else
-              Text('This quotation is ${quotation.status} and cannot be converted.'),
+            else ...[
+              if (canSend)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FilledButton.icon(
+                    onPressed: _send,
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Mark as Sent'),
+                  ),
+                ),
+              if (canConvert)
+                FilledButton.icon(
+                  onPressed: _convert,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Convert to Sales Order'),
+                )
+              else if (!canSend)
+                Text('This quotation is ${quotation.status} and cannot be converted.'),
+            ],
           ],
         ),
       ),
