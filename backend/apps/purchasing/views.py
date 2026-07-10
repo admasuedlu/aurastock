@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from apps.accounting import services as accounting_services
 from apps.core.viewsets import CompanyScopedViewSet
 
 from .models import GoodsReceipt, PurchaseOrder
@@ -28,9 +29,10 @@ class PurchaseOrderViewSet(CompanyScopedViewSet):
         if order.amount_paid + amount > order.total:
             raise DRFValidationError("Payment exceeds the outstanding balance.")
 
-        serializer.save(company=order.company, created_by=request.user)
+        payment = serializer.save(company=order.company, created_by=request.user)
         order.amount_paid += amount
         order.save(update_fields=["amount_paid", "updated_at"])
+        accounting_services.record_purchase_payment(payment, order)
         return Response(PurchaseOrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 

@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from apps.accounting import services as accounting_services
 from apps.core.viewsets import CompanyScopedViewSet
 from apps.inventory.models import StockMovement
 from apps.inventory.services import stock_in
@@ -94,4 +95,5 @@ class POSTransactionViewSet(CompanyScopedViewSet):
 
         pos_transaction.status = POSTransaction.Status.REFUNDED
         pos_transaction.save(update_fields=["status", "updated_at"])
+        accounting_services.record_pos_refund(pos_transaction, user=request.user)
         return Response(POSTransactionSerializer(pos_transaction).data)

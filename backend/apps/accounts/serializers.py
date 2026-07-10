@@ -4,6 +4,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.accounting.services import seed_default_chart_of_accounts
 from apps.tenants.models import Company, SubscriptionPlan
 
 from .models import Permission, Role, User
@@ -79,6 +80,7 @@ class CompanySignupSerializer(serializers.Serializer):
             name=validated_data["company_name"], slug=slug, subscription_plan=trial_plan,
         )
         roles = seed_default_roles(company)
+        seed_default_chart_of_accounts(company)
 
         user = User.objects.create_user(
             username=f"{slug}-owner",

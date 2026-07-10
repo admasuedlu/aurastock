@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/accounting/presentation/accounting_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -60,6 +61,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/inventory', builder: (context, state) => const InventoryScreen()),
           GoRoute(path: '/sales', builder: (context, state) => const SalesScreen()),
           GoRoute(path: '/purchases', builder: (context, state) => const PurchasingScreen()),
+          GoRoute(path: '/accounting', builder: (context, state) => const AccountingScreen()),
           GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
         ],
       ),

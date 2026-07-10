@@ -9,7 +9,9 @@ orders/invoices/payments, and purchase orders/goods receipts — wired directly 
 Phase 1 inventory engine (confirming an invoice deducts stock, receiving goods adds it).
 **Phase 3 (POS):** till sessions with cash reconciliation, and point-of-sale
 transactions with instant stock deduction and refunds — also wired into the same
-inventory engine.
+inventory engine. **Phase 4 (accounting):** a real double-entry ledger, with every
+revenue/expense event from Phases 2-3 automatically posting a balanced journal entry —
+not a separate, disconnected bookkeeping module.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -93,14 +95,35 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   computes expected cash (opening float + completed cash sales) against what the
   cashier counted, surfacing the variance; a cashier can only have one open session
   at a time, and a closed session rejects new sales
+- Accounting: a 12-account default chart of accounts (Cash, Bank, Accounts
+  Receivable, Inventory, VAT Receivable, Accounts Payable, VAT Payable, Withholding
+  Tax Payable, Owner's Equity, Retained Earnings, Sales Revenue, COGS, Operating
+  Expenses) seeded on signup. Every one of the following posts a balanced journal
+  entry automatically: invoice confirmed (Dr AR / Cr Revenue + VAT Payable), sales
+  payment (Dr Cash-or-Bank / Cr AR), goods receipt (Dr Inventory + VAT Receivable /
+  Cr AP — booked tax-inclusive so it nets to zero against a later full PO payment),
+  PO payment (Dr AP / Cr Cash-or-Bank), POS sale and refund (mirrored pairs), and
+  manual expenses (Dr Operating Expenses / Cr Cash-or-Bank). `create_journal_entry`
+  rejects any set of lines that doesn't balance, so an unbalanced entry simply
+  can't be persisted. Trial balance, P&L, and balance sheet report endpoints read
+  straight off the ledger. Verified end-to-end via curl: a full
+  PO→receive→pay→sell→POS-sale→POS-refund→expense sequence produces a trial balance
+  where total debits exactly equal total credits. Known simplification: there's no
+  period-end closing entry yet, so current-period net income sits in the Income/
+  Expense accounts rather than being rolled into Retained Earnings — the balance
+  sheet endpoint documents this (Assets won't equal Liabilities + Equity until that
+  exists), and COGS is never posted (no perpetual cost-of-goods-sold entry on sale),
+  so P&L net income is currently gross margin minus operating expenses, not true
+  net income.
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
   mobile), product list + add-product, inventory stock levels/history with stock
   action sheets, a Sales section (quotations/orders/invoices/customers) with
   quotation-to-order conversion and invoice confirm/payment actions, a Purchasing
   section (orders/suppliers) with combined receive-goods/record-payment actions, a
   POS screen (touch-friendly product grid, cart, checkout with change-due
-  calculation, today's-sales history with refund, shift open/close), settings
-  (language switch, theme, logout)
+  calculation, today's-sales history with refund, shift open/close), an Accounting
+  section (expenses, trial balance, P&L, balance sheet), settings (language switch,
+  theme, logout)
 - A demo tenant (`demo@aurastock.local` / `DemoPass123!`) can be seeded with sample
   products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
   invoice — ask to have it recreated, since the dev SQLite database is not persisted
@@ -108,12 +131,13 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 
 ## Known gaps (not yet built)
 
-Accounting (chart of accounts, journal entries, VAT/WHT reports, P&L/balance sheet),
-reporting & analytics, AI features (forecasting, anomaly detection), customer/supplier
-portals, notifications (SMS/email/push/WhatsApp), actual Ethiopian payment gateway
-integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
-*methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
-requests/approvals workflow, sales-order→invoice conversion (invoices are still created
-independently of an order for now), receipt printing / physical cash-drawer / barcode-
-scanner hardware integration, offline-mode sync for POS, and SaaS platform-admin
-screens are not implemented yet.
+Reporting & analytics (beyond the three accounting reports), AI features (forecasting,
+anomaly detection), customer/supplier portals, notifications (SMS/email/push/
+WhatsApp), actual Ethiopian payment gateway integrations (Telebirr/CBE Pay/M-Pesa/
+Amole — currently just selectable payment *methods*, not live merchant integrations),
+the Ethiopian calendar UI, purchase requests/approvals workflow, sales-order→invoice
+conversion (invoices are still created independently of an order for now), receipt
+printing / physical cash-drawer / barcode-scanner hardware integration, offline-mode
+sync for POS, period-end closing entries and perpetual COGS posting (see the
+Accounting simplifications noted above), and SaaS platform-admin screens are not
+implemented yet.

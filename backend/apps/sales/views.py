@@ -7,10 +7,10 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from apps.accounting import services as accounting_services
+from apps.core.numbering import next_value
 from apps.core.viewsets import CompanyScopedViewSet
 from apps.inventory.services import stock_out
-
-from apps.core.numbering import next_value
 
 from .models import Invoice, Quotation, SalesOrder, SalesOrderItem, SalesPayment
 from .serializers import (
@@ -107,6 +107,7 @@ class InvoiceViewSet(CompanyScopedViewSet):
 
         invoice.status = Invoice.Status.CONFIRMED
         invoice.save(update_fields=["status", "updated_at"])
+        accounting_services.record_invoice_confirmed(invoice)
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=True, methods=["post"], url_path="record-payment")
@@ -124,10 +125,11 @@ class InvoiceViewSet(CompanyScopedViewSet):
         if invoice.amount_paid + amount > invoice.total:
             raise DRFValidationError("Payment exceeds the outstanding balance.")
 
-        serializer.save(company=invoice.company, created_by=request.user)
+        payment = serializer.save(company=invoice.company, created_by=request.user)
         invoice.amount_paid += amount
         invoice.status = (
             Invoice.Status.PAID if invoice.amount_paid >= invoice.total else Invoice.Status.PARTIALLY_PAID
         )
         invoice.save(update_fields=["amount_paid", "status", "updated_at"])
+        accounting_services.record_sales_payment(payment, invoice)
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)

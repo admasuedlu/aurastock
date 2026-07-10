@@ -8,7 +8,9 @@ class AppShell extends StatelessWidget {
 
   final Widget child;
 
-  static const _destinations = ['/', '/pos', '/products', '/inventory', '/sales', '/purchases', '/settings'];
+  static const _destinations = [
+    '/', '/pos', '/products', '/inventory', '/sales', '/purchases', '/accounting', '/settings',
+  ];
 
   int _indexForLocation(String location) {
     final index = _destinations.indexWhere((d) => location == d || location.startsWith('$d/'));
@@ -22,6 +24,7 @@ class AppShell extends StatelessWidget {
         NavigationDestinationLabel(l10n.inventory, Icons.warehouse_outlined, Icons.warehouse),
         NavigationDestinationLabel(l10n.sales, Icons.receipt_long_outlined, Icons.receipt_long),
         NavigationDestinationLabel(l10n.purchases, Icons.shopping_cart_outlined, Icons.shopping_cart),
+        NavigationDestinationLabel(l10n.accounting, Icons.account_balance_outlined, Icons.account_balance),
         NavigationDestinationLabel(l10n.settings, Icons.settings_outlined, Icons.settings),
       ];
 

@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.accounting import services as accounting_services
 from apps.core.numbering import next_value
 from apps.inventory.services import stock_in
 
@@ -89,6 +92,8 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
         validated_data["number"] = next_value(company, "goods_receipt", default_prefix="GRN-")
         receipt = GoodsReceipt.objects.create(**validated_data)
 
+        total_cost = Decimal("0")
+        total_tax = Decimal("0")
         for item_data in items_data:
             GoodsReceiptItem.objects.create(company=company, goods_receipt=receipt, **item_data)
             stock_in(
@@ -101,12 +106,18 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
             po_item.quantity_received += item_data["quantity"]
             po_item.save(update_fields=["quantity_received"])
 
+            line_cost = item_data["quantity"] * item_data["unit_cost"]
+            total_cost += line_cost
+            total_tax += line_cost * po_item.tax_percent / Decimal("100")
+
         all_items = purchase_order.items.all()
         if all(i.quantity_received >= i.quantity for i in all_items):
             purchase_order.status = PurchaseOrder.Status.RECEIVED
         else:
             purchase_order.status = PurchaseOrder.Status.PARTIALLY_RECEIVED
         purchase_order.save(update_fields=["status", "updated_at"])
+
+        accounting_services.record_goods_receipt(receipt, total_cost, total_tax)
 
         return receipt
 

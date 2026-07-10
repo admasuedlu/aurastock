@@ -1,6 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.accounting import services as accounting_services
 from apps.core.numbering import next_value
 from apps.inventory.services import stock_out
 
@@ -76,4 +77,5 @@ class POSTransactionSerializer(serializers.ModelSerializer):
                 quantity=item.quantity, reference=pos_transaction.number, reason="POS sale", user=user,
             )
 
+        accounting_services.record_pos_sale(pos_transaction)
         return pos_transaction
