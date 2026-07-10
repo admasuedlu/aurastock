@@ -15,7 +15,11 @@ not a separate, disconnected bookkeeping module. **Phase 5 (reporting & analytic
 sales trend/top-products/inventory-valuation/dead-stock reports computed live off the
 same data, plus wiring the dashboard's Today's Sales and Monthly Revenue cards to real
 numbers for the first time (they were a hardcoded 0 placeholder through Phase 1-4,
-since there was no sales data yet).
+since there was no sales data yet). **Phase 6 (AI insights):** reorder suggestions,
+demand forecasting, and anomaly detection computed with real statistics (least-squares
+regression, mean/stdev) over actual sales history — not a call to an external LLM,
+which would need credentials this project doesn't have and couldn't be verified
+without them.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -129,15 +133,31 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   rather than one query per product). All hand-verified against seeded data with
   known-correct expected numbers (e.g. a product sold 5 via invoice + 3 via POS
   shows quantity_sold=8, revenue=8×price).
+- AI Insights: reorder suggestions (suggested quantity = 30-day actual sales
+  velocity × a 7-day lead time + safety stock − what's available, only for products
+  at or below their reorder point — not an arbitrary guess), demand forecasting
+  (ordinary least-squares linear regression, pure Python via the stdlib `statistics`
+  module, no numpy dependency, on 60 days of stock-out history per product, projected
+  forward with a trend label), and anomaly detection (flags stock-out movements more
+  than 2 standard deviations above that product's own historical mean — skips
+  products with too little history to make a stdev meaningful, rather than flagging
+  noise). Verified with seeded, backdated movement history (the API always
+  timestamps at "now", so realistic history had to be inserted directly via the ORM):
+  a synthetic upward sales trend was correctly detected as "increasing" with a rising
+  forecast, and a single planted 60-unit outlier against a ~6-unit baseline was the
+  only thing flagged.
+- Reports & Insights are reachable via two icons on the dashboard rather than the
+  main nav, which was already at 8 destinations.
 - Flutter: splash/login/signup, responsive dashboard (rail on desktop, bottom nav on
-  mobile, real sales KPIs + a 30-day trend chart) with a Reports icon leading to
-  top-products/valuation/dead-stock tabs, product list + add-product, inventory
-  stock levels/history with stock action sheets, a Sales section (quotations/orders/
-  invoices/customers) with quotation-to-order conversion and invoice confirm/payment
-  actions, a Purchasing section (orders/suppliers) with combined receive-goods/
-  record-payment actions, a POS screen (touch-friendly product grid, cart, checkout
-  with change-due calculation, today's-sales history with refund, shift open/close),
-  an Accounting section (expenses, trial balance, P&L, balance sheet), settings
+  mobile, real sales KPIs + a 30-day trend chart), product list + add-product,
+  inventory stock levels/history with stock action sheets, a Sales section
+  (quotations/orders/invoices/customers) with quotation-to-order conversion and
+  invoice confirm/payment actions, a Purchasing section (orders/suppliers) with
+  combined receive-goods/record-payment actions, a POS screen (touch-friendly
+  product grid, cart, checkout with change-due calculation, today's-sales history
+  with refund, shift open/close), an Accounting section (expenses, trial balance,
+  P&L, balance sheet), a Reports screen (top products/valuation/dead-stock), an AI
+  Insights screen (reorder suggestions/demand forecast chart/anomalies), settings
   (language switch, theme, logout)
 - A demo tenant (`demo@aurastock.local` / `DemoPass123!`) can be seeded with sample
   products, stock, a completed purchase→receive cycle, and a confirmed/partially-paid
@@ -148,8 +168,9 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 
 Beyond the sales/top-products/valuation/dead-stock reports and the three accounting
 reports, there's no purchase-trend report, no ABC analysis, no custom report builder,
-and no export to Excel/CSV/PDF. Also not built: AI features (demand forecasting,
-anomaly detection, reorder suggestions), customer/supplier portals, notifications
+and no export to Excel/CSV/PDF. The AI insights are honest statistics on real data, not
+a "customer purchase prediction" or "intelligent dashboard" in the fuller sense of the
+original spec. Also not built: customer/supplier portals, notifications
 (SMS/email/push/WhatsApp), actual Ethiopian payment gateway integrations (Telebirr/
 CBE Pay/M-Pesa/Amole — currently just selectable payment *methods*, not live merchant
 integrations), the Ethiopian calendar UI, purchase requests/approvals workflow,

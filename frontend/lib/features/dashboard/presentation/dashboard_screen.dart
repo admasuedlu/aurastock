@@ -33,6 +33,11 @@ class DashboardScreen extends ConsumerWidget {
             tooltip: l10n.reports,
             onPressed: () => context.go('/reports'),
           ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            tooltip: 'AI Insights',
+            onPressed: () => context.go('/insights'),
+          ),
           if (user != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
