@@ -11,11 +11,16 @@ from rest_framework_simplejwt.tokens import AccessToken
 def _get_user(user_id):
     from django.contrib.auth import get_user_model
 
+    from apps.core.authentication import company_is_blocked
+
     User = get_user_model()
     try:
-        return User.objects.get(id=user_id)
+        user = User.objects.select_related("company").get(id=user_id)
     except User.DoesNotExist:
         return AnonymousUser()
+    if company_is_blocked(user.company):
+        return AnonymousUser()
+    return user
 
 
 class JWTAuthMiddleware(BaseMiddleware):

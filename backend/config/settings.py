@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.reports",
     "apps.insights",
     "apps.notifications",
+    "apps.platform",
 ]
 
 MIDDLEWARE = [
@@ -119,7 +120,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # JWT plus a tenant-suspension check; see apps/core/authentication.py
+        "apps.core.authentication.TenantAwareJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",

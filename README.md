@@ -24,7 +24,12 @@ push channel (WebSocket, same JWT-over-query-string pattern as Phase 1's invento
 socket) plus dev-mode email — low-stock alerts fire automatically from the same
 `stock_out` choke point every sale already goes through, and overdue-invoice
 reminders are raised by a scan endpoint that simulates what a Celery beat schedule
-would run periodically (no beat schedule is actually wired up).
+would run periodically (no beat schedule is actually wired up). **Phase 8 (SaaS
+platform admin):** a platform-operator layer on top of the tenants — tenant list with
+live usage counts, suspend/reactivate that actually locks the tenant out (token
+issuance, API access, and WebSockets, not just a status flag), subscription plan
+management, and real plan-limit enforcement (users/branches/warehouses) at the
+creation choke points.
 
 The full spec (POS, accounting, reporting/analytics, AI forecasting, Ethiopian payment
 gateway integrations, notifications, SaaS admin, 150+ screens per the product brief,
@@ -48,8 +53,20 @@ pip install -r requirements.txt
 copy .env.example .env      # or cp on macOS/Linux
 python manage.py migrate
 python manage.py seed_permissions
+python manage.py seed_plans
 python manage.py runserver
 ```
+
+To operate the platform itself (tenant list, suspensions, plan management), create
+a platform-level admin — tenant signup can't produce one, since it always creates
+a company:
+
+```
+python manage.py create_platform_admin admin@example.com <password>
+```
+
+Logging into the app with that account lands on the platform-admin console instead
+of the tenant shell.
 
 For local development without Docker/Postgres/Redis running, set `USE_SQLITE=True`
 in the environment — this swaps in SQLite, an in-memory cache, and an in-memory
@@ -205,6 +222,30 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   Reports/Insights icon-button precedent rather than crowding the 8-destination
   main nav further) and a notification center screen that loads via REST and then
   live-updates over the WebSocket.
+- SaaS platform admin: platform staff are users with **no** company FK (created via
+  `manage.py create_platform_admin`; tenant signup can't produce one), gated by a
+  dedicated `IsPlatformAdmin` permission a tenant user can never satisfy regardless
+  of their role. Endpoints: platform overview KPIs (tenant/user/signup counts by
+  subscription status), tenant list with per-company user/branch/warehouse counts
+  (single-query annotations, not N+1), suspend/reactivate, plan CRUD, and
+  change-plan. Suspension is enforced in the default JWT **authentication** class
+  rather than a permission class — several views set their own
+  `permission_classes`, which would silently bypass a default permission — so a
+  suspended tenant's users are locked out of every endpoint at once, existing
+  tokens included; fresh logins are also refused with a clear message, and the
+  WebSocket handshake rejects them too. Verified end-to-end: suspend → the
+  tenant's live token 401s and login fails while a second tenant is unaffected →
+  reactivate → the same token works again. Plan limits are real, not decorative:
+  creating a user/branch/warehouse checks the company's plan cap at the creation
+  choke point and 400s with an upgrade message (verified: trial's 1-warehouse cap
+  blocked a 2nd warehouse; upgrading to Starter via the change-plan endpoint
+  unblocked it; Starter's 5-user cap allowed invites up to exactly 5 and blocked
+  the 6th). `seed_plans` seeds Free Trial/Starter/Business/Enterprise tiers
+  (idempotent, matches the `trial` code signup auto-assigns). Flutter: logging in
+  as platform staff routes to a dedicated platform console (overview KPI tiles,
+  company list with search/status chips/suspend/change-plan actions, plan
+  editor) — tenant users are hard-redirected away from it and platform staff
+  can't wander into tenant screens that assume a company.
 
 ## Known gaps (not yet built)
 
@@ -223,5 +264,11 @@ requests/approvals workflow, sales-order→invoice conversion (invoices are stil
 independently of an order for now), receipt printing / physical cash-drawer /
 barcode-scanner hardware integration, offline-mode sync for POS, period-end closing
 entries and perpetual COGS posting (see the Accounting simplifications noted above),
-a real Celery beat schedule (the overdue-invoice scan is a POST endpoint that
-simulates one, not an actual periodic task), and SaaS platform-admin screens.
+and a real Celery beat schedule (the overdue-invoice scan is a POST endpoint that
+simulates one, not an actual periodic task). The platform-admin layer manages
+subscriptions but doesn't *bill* them — there's no payment collection, invoice
+generation for the SaaS fee, or automatic suspension on non-payment (that's the
+same missing-payment-gateway problem as the tenant-facing Telebirr integration);
+plan limits are enforced only on users/branches/warehouses, not on product counts
+or storage; and `past_due`/`cancelled` statuses exist on the model but nothing
+transitions companies into them automatically.

@@ -1,9 +1,11 @@
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.viewsets import CompanyScopedViewSet
+from apps.tenants.limits import enforce_plan_limit
 
 from .models import Role, User
 from .serializers import (
@@ -55,8 +57,16 @@ class InviteUserSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        # CompanyScopedViewSet.perform_create injects company= via
+        # serializer.save(company=...), so it arrives in validated_data --
+        # pop it rather than passing our own copy alongside (TypeError).
+        company = validated_data.pop("company", None) or self.context["request"].user.company
+        try:
+            enforce_plan_limit(company, "users")
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
         password = validated_data.pop("password")
-        user = User(**validated_data, company=self.context["request"].user.company)
+        user = User(**validated_data, company=company)
         user.set_password(password)
         user.save()
         return user

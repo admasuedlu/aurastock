@@ -1,8 +1,11 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import permissions
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.generics import RetrieveUpdateAPIView
 
 from apps.core.viewsets import CompanyScopedViewSet
 
+from .limits import enforce_plan_limit
 from .models import Branch, Company
 from .serializers import BranchSerializer, CompanySerializer
 
@@ -22,3 +25,10 @@ class BranchViewSet(CompanyScopedViewSet):
     serializer_class = BranchSerializer
     filterset_fields = ["is_active", "is_main"]
     search_fields = ["name", "code", "city"]
+
+    def perform_create(self, serializer):
+        try:
+            enforce_plan_limit(self.request.user.company, "branches")
+        except DjangoValidationError as exc:
+            raise DRFValidationError(exc.messages)
+        super().perform_create(serializer)

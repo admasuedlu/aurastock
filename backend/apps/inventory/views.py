@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.viewsets import CompanyScopedViewSet
+from apps.tenants.limits import enforce_plan_limit
 
 from . import services
 from .models import StockItem, StockMovement, Warehouse
@@ -40,6 +41,13 @@ class WarehouseViewSet(CompanyScopedViewSet):
     serializer_class = WarehouseSerializer
     filterset_fields = ["branch", "is_active"]
     search_fields = ["name", "code"]
+
+    def perform_create(self, serializer):
+        try:
+            enforce_plan_limit(self.request.user.company, "warehouses")
+        except DjangoValidationError as exc:
+            raise DRFValidationError(exc.messages)
+        super().perform_create(serializer)
 
 
 class StockItemViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):

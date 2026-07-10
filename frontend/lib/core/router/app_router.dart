@@ -11,6 +11,7 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/insights/presentation/insights_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/platform/presentation/platform_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
 import '../../features/products/presentation/product_list_screen.dart';
 import '../../features/purchasing/presentation/purchasing_screen.dart';
@@ -42,11 +43,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         return isSplash ? null : '/splash';
       }
 
-      final isAuthenticated = authState.valueOrNull != null;
-      if (!isAuthenticated) {
+      final user = authState.valueOrNull;
+      if (user == null) {
         return isAuthRoute ? null : '/login';
       }
-      if (isAuthRoute || isSplash) {
+      // Platform staff (no company) get the platform-admin shell and nothing
+      // else; tenant users can never reach it.
+      final isPlatformStaff = user.companyId == null;
+      if (isPlatformStaff) {
+        return location == '/platform' ? null : '/platform';
+      }
+      if (isAuthRoute || isSplash || location == '/platform') {
         return '/';
       }
       return null;
@@ -55,6 +62,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (context, state) => const SignupScreen()),
+      GoRoute(path: '/platform', builder: (context, state) => const PlatformScreen()),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
