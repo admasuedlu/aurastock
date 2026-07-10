@@ -112,6 +112,11 @@ class SalesOrderItem(_LineItem):
     sales_order = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="+")
     variant = models.ForeignKey("products.ProductVariant", on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    quantity_invoiced = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+
+    @property
+    def quantity_outstanding(self) -> Decimal:
+        return self.quantity - self.quantity_invoiced
 
 
 class Invoice(_Document):

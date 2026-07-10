@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -90,20 +90,51 @@ class SalesOrderViewSet(CompanyScopedViewSet):
     @action(detail=True, methods=["post"], url_path="convert-to-invoice")
     @transaction.atomic
     def convert_to_invoice(self, request, pk=None):
-        """Creates a draft invoice from a sales order, copying its line items
-        and linking back via Invoice.sales_order. Until now invoices were only
-        ever created standalone; this is the SO->invoice step of the sales
-        flow. An invoice needs a warehouse (to deduct stock from on confirm)
-        that the order doesn't carry, so the caller supplies it here."""
+        """Creates a draft invoice from a sales order, copying line items and
+        linking back via Invoice.sales_order. Supports partial invoicing: pass
+        `items: [{sales_order_item, quantity}, ...]` to invoice specific
+        amounts, or omit it to invoice every line's full outstanding quantity.
+        Each SO line tracks quantity_invoiced (like a PO tracks
+        quantity_received), so an order can be billed across several invoices;
+        the order goes CONFIRMED while anything is still outstanding and
+        FULFILLED once every line is fully invoiced. An invoice needs a
+        warehouse (to deduct stock from on confirm) that the order doesn't
+        carry, so the caller supplies it."""
         order = self.get_object()
         if order.status == SalesOrder.Status.CANCELLED:
             raise DRFValidationError("A cancelled sales order cannot be invoiced.")
-        if order.invoices.exists():
-            raise DRFValidationError("This sales order has already been invoiced.")
 
-        order_items = list(order.items.select_related("product", "variant").all())
+        order_items = {str(i.id): i for i in order.items.select_related("product", "variant").all()}
         if not order_items:
             raise DRFValidationError("Sales order has no line items to invoice.")
+
+        requested = request.data.get("items")
+        if requested:
+            to_invoice = []
+            for entry in requested:
+                item = order_items.get(str(entry.get("sales_order_item")))
+                if item is None:
+                    raise DRFValidationError({"items": "A line does not belong to this sales order."})
+                try:
+                    qty = Decimal(str(entry.get("quantity")))
+                except (InvalidOperation, TypeError):
+                    raise DRFValidationError({"items": f"Invalid quantity for {item.product.name}."})
+                if qty <= 0:
+                    continue
+                if qty > item.quantity_outstanding:
+                    raise DRFValidationError({
+                        "items": f"Cannot invoice {qty} of {item.product.name}: only "
+                                 f"{item.quantity_outstanding} outstanding."
+                    })
+                to_invoice.append((item, qty))
+        else:
+            to_invoice = [
+                (item, item.quantity_outstanding)
+                for item in order_items.values() if item.quantity_outstanding > 0
+            ]
+
+        if not to_invoice:
+            raise DRFValidationError("Nothing left to invoice on this sales order.")
 
         warehouse_id = request.data.get("warehouse")
         if not warehouse_id:
@@ -121,19 +152,28 @@ class SalesOrderViewSet(CompanyScopedViewSet):
         invoice_items = [
             InvoiceItem(
                 company=order.company, invoice=invoice, product=item.product, variant=item.variant,
-                quantity=item.quantity, unit_price=item.unit_price,
+                quantity=qty, unit_price=item.unit_price,
                 discount_percent=item.discount_percent, tax_percent=item.tax_percent,
             )
-            for item in order_items
+            for item, qty in to_invoice
         ]
         InvoiceItem.objects.bulk_create(invoice_items)
         invoice.recalculate_totals(invoice_items)
         invoice.save(update_fields=["subtotal", "discount_total", "tax_total", "total"])
 
-        # The order is now a firm, invoiced order -- CONFIRMED rather than
-        # FULFILLED, since the goods don't actually leave until the invoice is
-        # confirmed. invoices.exists() above is what blocks a second invoice.
-        order.status = SalesOrder.Status.CONFIRMED
+        for item, qty in to_invoice:
+            item.quantity_invoiced += qty
+            item.save(update_fields=["quantity_invoiced"])
+
+        # Fully invoiced (every line's outstanding is zero) -> FULFILLED;
+        # otherwise still CONFIRMED with more to bill later. Check order_items
+        # (freshly loaded and mutated above), not order.items.all() -- the
+        # latter is the prefetched cache from get_object() and still holds the
+        # pre-increment quantities.
+        if all(i.quantity_outstanding <= 0 for i in order_items.values()):
+            order.status = SalesOrder.Status.FULFILLED
+        else:
+            order.status = SalesOrder.Status.CONFIRMED
         order.save(update_fields=["status", "updated_at"])
 
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)

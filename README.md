@@ -119,18 +119,25 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 - Real-time stock updates over WebSocket (JWT-authenticated) for dashboard/warehouse screens
 - Customers and suppliers (basic CRM/vendor records with credit limit / payment terms)
 - Sales: quotations (convertible to a sales order, copying line items and locking the
-  quotation as `converted`), sales orders (convertible in turn to an invoice — copies
-  the line items, links the invoice back via `Invoice.sales_order`, and marks the
-  order `confirmed`; the caller supplies the warehouse the order doesn't carry, and a
-  second conversion is blocked once an invoice exists), and invoices with line items,
-  discounts, and tax; confirming an invoice deducts stock via the Phase 1 inventory
-  service; payments (cash/bank/Telebirr/CBE Pay/M-Pesa/Amole as payment *methods* —
-  gateway integrations themselves are not built) track amount paid / balance due and
-  auto-transition invoice status. The full quotation→order→invoice chain now works
-  end to end (verified via curl: a 5-unit order converts to a 575.00 invoice with 2
-  line items copied, links back to the order, flips it to `confirmed`, blocks a repeat
-  conversion, and the resulting invoice confirms straight into the perpetual-COGS
-  path — 5 units × 60 cost = 300.00 COGS)
+  quotation as `converted`), sales orders (convertible in turn to invoices — supports
+  **partial invoicing**: each SO line tracks `quantity_invoiced` like a PO line tracks
+  `quantity_received`, so an order can be billed across several invoices; pass
+  `items: [{sales_order_item, quantity}]` to invoice specific amounts or omit it to
+  invoice every line's full outstanding quantity, over-invoicing is blocked per line,
+  the order stays `confirmed` while anything is outstanding and flips to `fulfilled`
+  once every line is fully billed, and each invoice links back via
+  `Invoice.sales_order`; the caller supplies the warehouse the order doesn't carry),
+  and invoices with line items, discounts, and tax; confirming an invoice deducts
+  stock via the Phase 1 inventory service; payments (cash/bank/Telebirr/CBE Pay/M-Pesa/
+  Amole as payment *methods* — gateway integrations themselves are not built) track
+  amount paid / balance due and auto-transition invoice status. The full
+  quotation→order→invoice chain now works end to end (verified via curl: a 10-unit
+  order invoices 4 + 4 + 2 across three linked invoices — outstanding tracked at
+  6 → 2 → 0, status `confirmed`→`confirmed`→`fulfilled`, over-invoicing rejected at
+  each step — and the resulting invoices confirm straight into the perpetual-COGS
+  path). Flutter: tapping a sales order opens an actions sheet with a warehouse
+  picker and a per-line quantity editor pre-filled with each line's outstanding
+  amount, so staff can bill the whole remainder or a partial slice.
 - Purchasing: purchase orders with line items; goods receipts against a PO (full or
   partial) add stock via the same inventory service and auto-update PO status
   (draft → sent → approved → partially_received → received); over-receiving is
@@ -366,8 +373,7 @@ the number they typed); SMS/WhatsApp delivery is architected for but not impleme
 per the note above. Also not built: actual Ethiopian payment
 gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
 *methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
-requests/approvals workflow, partial invoicing of a sales order (conversion creates one
-invoice for the whole order, not several partial ones), receipt printing / physical
+requests/approvals workflow, receipt printing / physical
 cash-drawer / barcode-scanner hardware integration, offline-mode sync for POS, closing to a
 user-chosen fiscal period end rather than always "everything up to now" (see
 the Accounting note above), and a real Celery beat schedule (the

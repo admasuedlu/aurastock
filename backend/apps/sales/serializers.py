@@ -17,12 +17,14 @@ class QuotationItemSerializer(serializers.ModelSerializer):
 
 class SalesOrderItemSerializer(serializers.ModelSerializer):
     line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    quantity_outstanding = serializers.DecimalField(max_digits=14, decimal_places=3, read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
 
     class Meta:
         model = SalesOrderItem
         fields = ["id", "product", "product_name", "variant", "quantity", "unit_price",
-                  "discount_percent", "tax_percent", "line_total"]
+                  "discount_percent", "tax_percent", "quantity_invoiced", "quantity_outstanding", "line_total"]
+        read_only_fields = ["quantity_invoiced"]
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):

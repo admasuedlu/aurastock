@@ -37,9 +37,17 @@ class SalesRepository {
     return results.map((e) => SalesOrder.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<Invoice> convertSalesOrderToInvoice(String orderId, {required String warehouseId}) async {
+  /// Converts a sales order to an invoice. When [items] is given (a list of
+  /// `{sales_order_item, quantity}`), only those partial amounts are invoiced;
+  /// omitting it invoices every line's full outstanding quantity.
+  Future<Invoice> convertSalesOrderToInvoice(
+    String orderId, {
+    required String warehouseId,
+    List<Map<String, dynamic>>? items,
+  }) async {
     final response = await _dio.post('/sales-orders/$orderId/convert-to-invoice/', data: {
       'warehouse': warehouseId,
+      if (items != null) 'items': items,
     });
     return Invoice.fromJson(response.data as Map<String, dynamic>);
   }
