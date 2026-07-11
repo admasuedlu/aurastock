@@ -5,6 +5,7 @@ from django.urls import path
 from .views import (
     AssembleView,
     BatchViewSet,
+    SerialUnitViewSet,
     StockAdjustmentView,
     StockInView,
     StockItemViewSet,
@@ -19,6 +20,7 @@ router.register("warehouses", WarehouseViewSet, basename="warehouse")
 router.register("stock-items", StockItemViewSet, basename="stock-item")
 router.register("stock-movements", StockMovementViewSet, basename="stock-movement")
 router.register("batches", BatchViewSet, basename="batch")
+router.register("serial-units", SerialUnitViewSet, basename="serial-unit")
 
 urlpatterns = [
     path("inventory/stock-in/", StockInView.as_view(), name="stock-in"),

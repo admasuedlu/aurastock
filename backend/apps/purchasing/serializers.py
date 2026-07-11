@@ -67,10 +67,11 @@ class GoodsReceiptItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = GoodsReceiptItem
         fields = ["id", "purchase_order_item", "product", "product_name", "variant", "quantity",
-                  "unit_cost", "batch_number", "expiry_date"]
+                  "unit_cost", "batch_number", "expiry_date", "serial_numbers"]
         extra_kwargs = {
             "batch_number": {"required": False},
             "expiry_date": {"required": False},
+            "serial_numbers": {"required": False},
         }
 
 
@@ -119,6 +120,7 @@ class GoodsReceiptSerializer(serializers.ModelSerializer):
                 reason="Goods receipt", user=user,
                 batch_number=item_data.get("batch_number", ""),
                 expiry_date=item_data.get("expiry_date"),
+                serial_numbers=item_data.get("serial_numbers"),
             )
             po_item = item_data["purchase_order_item"]
             po_item.quantity_received += item_data["quantity"]

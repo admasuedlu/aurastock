@@ -32,6 +32,7 @@ class Product {
     required this.reorderLevel,
     required this.trackBatch,
     required this.trackExpiry,
+    required this.trackSerial,
     required this.isActive,
   });
 
@@ -49,6 +50,7 @@ class Product {
       reorderLevel: double.tryParse(json['reorder_level'].toString()) ?? 0,
       trackBatch: json['track_batch'] as bool? ?? false,
       trackExpiry: json['track_expiry'] as bool? ?? false,
+      trackSerial: json['track_serial'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
     );
   }
@@ -65,9 +67,12 @@ class Product {
   final double reorderLevel;
   final bool trackBatch;
   final bool trackExpiry;
+  final bool trackSerial;
   final bool isActive;
 
-  bool get isBatchTracked => trackBatch || trackExpiry;
+  // Serial and batch tracking are mutually exclusive; serial wins.
+  bool get isSerialTracked => trackSerial;
+  bool get isBatchTracked => (trackBatch || trackExpiry) && !trackSerial;
   bool get isBundle => productType == 'bundle';
 }
 

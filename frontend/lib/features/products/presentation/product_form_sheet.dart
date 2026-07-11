@@ -30,6 +30,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
   String? _unitId;
   bool _trackBatch = false;
   bool _trackExpiry = false;
+  bool _trackSerial = false;
   bool _isBundle = false;
   bool _submitting = false;
 
@@ -57,6 +58,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             reorderLevel: double.tryParse(_reorderController.text) ?? 0,
             trackBatch: _trackBatch,
             trackExpiry: _trackExpiry,
+            trackSerial: _trackSerial,
             isBundle: _isBundle,
           );
       ref.invalidate(productListProvider);
@@ -167,6 +169,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
               onChanged: (v) => setState(() {
                 _trackBatch = v;
                 if (!v) _trackExpiry = false;
+                if (v) _trackSerial = false;
               }),
             ),
             SwitchListTile(
@@ -176,7 +179,23 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
               value: _trackExpiry,
               onChanged: (v) => setState(() {
                 _trackExpiry = v;
-                if (v) _trackBatch = true;
+                if (v) {
+                  _trackBatch = true;
+                  _trackSerial = false;
+                }
+              }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Track serial numbers'),
+              subtitle: const Text('Each unit individually identified (mutually exclusive with batches)'),
+              value: _trackSerial,
+              onChanged: (v) => setState(() {
+                _trackSerial = v;
+                if (v) {
+                  _trackBatch = false;
+                  _trackExpiry = false;
+                }
               }),
             ),
             SwitchListTile(

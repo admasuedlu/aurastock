@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from apps.products.models import Product, ProductVariant
 
-from .models import Batch, StockItem, StockMovement, Warehouse
+from .models import Batch, SerialUnit, StockItem, StockMovement, Warehouse
 
 
 class WarehouseSerializer(serializers.ModelSerializer):
@@ -62,6 +62,21 @@ class BatchSerializer(serializers.ModelSerializer):
                   "expiry_date", "quantity_on_hand"]
 
 
+class SerialUnitSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+    warehouse_name = serializers.CharField(source="warehouse.name", read_only=True, default=None)
+
+    class Meta:
+        model = SerialUnit
+        fields = ["id", "product", "product_name", "product_sku", "serial_number",
+                  "warehouse", "warehouse_name", "status", "reference", "created_at"]
+
+
+def _serial_field():
+    return serializers.ListField(child=serializers.CharField(max_length=120), required=False)
+
+
 class _CompanyScopedActionSerializer(serializers.Serializer):
     """Base for stock-operation input serializers: scopes FK choice fields
     to the requesting user's company so cross-tenant IDs are rejected."""
@@ -87,6 +102,7 @@ class StockInSerializer(_CompanyScopedActionSerializer):
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
     batch_number = serializers.CharField(max_length=100, required=False, allow_blank=True)
     expiry_date = serializers.DateField(required=False, allow_null=True)
+    serial_numbers = _serial_field()
 
     def _scoped_fields(self):
         return {"warehouse": Warehouse, "product": Product, "variant": ProductVariant}
@@ -99,6 +115,7 @@ class StockOutSerializer(_CompanyScopedActionSerializer):
     quantity = serializers.DecimalField(max_digits=14, decimal_places=3, min_value=Decimal("0.001"))
     reference = serializers.CharField(max_length=100, required=False, allow_blank=True)
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    serial_numbers = _serial_field()
 
     def _scoped_fields(self):
         return {"warehouse": Warehouse, "product": Product, "variant": ProductVariant}
@@ -112,6 +129,7 @@ class StockTransferSerializer(_CompanyScopedActionSerializer):
     quantity = serializers.DecimalField(max_digits=14, decimal_places=3, min_value=Decimal("0.001"))
     reference = serializers.CharField(max_length=100, required=False, allow_blank=True)
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    serial_numbers = _serial_field()
 
     def _scoped_fields(self):
         return {"from_warehouse": Warehouse, "to_warehouse": Warehouse, "product": Product, "variant": ProductVariant}
@@ -125,6 +143,7 @@ class StockAdjustmentSerializer(_CompanyScopedActionSerializer):
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
     batch_number = serializers.CharField(max_length=100, required=False, allow_blank=True)
     expiry_date = serializers.DateField(required=False, allow_null=True)
+    serial_numbers = _serial_field()
 
     def _scoped_fields(self):
         return {"warehouse": Warehouse, "product": Product, "variant": ProductVariant}

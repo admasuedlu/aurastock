@@ -16,10 +16,11 @@ from apps.core.viewsets import CompanyScopedViewSet
 from apps.tenants.limits import enforce_plan_limit
 
 from . import services
-from .models import Batch, StockItem, StockMovement, Warehouse
+from .models import Batch, SerialUnit, StockItem, StockMovement, Warehouse
 from .serializers import (
     AssembleSerializer,
     BatchSerializer,
+    SerialUnitSerializer,
     StockAdjustmentSerializer,
     StockInSerializer,
     StockItemSerializer,
@@ -127,6 +128,22 @@ class BatchViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
         page = self.paginate_queryset(batches)
         serializer = self.get_serializer(page if page is not None else batches, many=True)
         return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
+
+
+class SerialUnitViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Individually-identified units. Filter by `?product=`, `?status=in_stock`,
+    `?warehouse=`, or `?serial_number=<exact>` to trace one unit (warranty/recall
+    -- `reference` records the document it left on)."""
+
+    serializer_class = SerialUnitSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ["product", "status", "warehouse", "serial_number"]
+    search_fields = ["serial_number"]
+
+    def get_queryset(self):
+        return SerialUnit.objects.filter(
+            company_id=self.request.user.company_id,
+        ).select_related("product", "warehouse")
 
 
 class _StockActionView(APIView):

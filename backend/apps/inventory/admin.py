@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Batch, BatchStock, StockItem, StockMovement, Warehouse
+from .models import Batch, BatchStock, SerialUnit, StockItem, StockMovement, Warehouse
 
 
 @admin.register(Warehouse)
@@ -34,3 +34,10 @@ class BatchAdmin(admin.ModelAdmin):
 class BatchStockAdmin(admin.ModelAdmin):
     list_display = ["batch", "warehouse", "product", "quantity_on_hand"]
     list_filter = ["company", "warehouse"]
+
+
+@admin.register(SerialUnit)
+class SerialUnitAdmin(admin.ModelAdmin):
+    list_display = ["serial_number", "product", "warehouse", "status", "reference"]
+    list_filter = ["company", "status", "warehouse"]
+    search_fields = ["serial_number", "product__name", "product__sku"]

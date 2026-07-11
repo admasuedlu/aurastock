@@ -74,6 +74,7 @@ class GoodsReceiptItem(CompanyScopedModel):
     unit_cost = models.DecimalField(max_digits=14, decimal_places=4)
     batch_number = models.CharField(max_length=100, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
+    serial_numbers = models.JSONField(default=list, blank=True)
 
 
 class PurchasePayment(CompanyScopedModel):

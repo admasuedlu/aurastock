@@ -74,7 +74,8 @@ Running the backend tests
 -------------------------
 There's a Django test suite (no extra dependencies — the built-in runner) covering
 the core invariants: weighted-average costing, insufficient-stock guards, batch/lot
-FEFO and the expiring-batches report, bundle/kit assembly (component consumption +
+FEFO and the expiring-batches report, serial-number tracking (receipt, auto-FIFO
+sale, transfer, warranty lookup), bundle/kit assembly (component consumption +
 cost blending), quotation→order→invoice conversion and partial
 invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
 approval state machine, goods-receipt stock updates and over-receiving guard,
@@ -157,9 +158,22 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   need no batch and behave exactly as before. Verified via curl (13 checks): batch
   + expiry required on receipt, FEFO consuming the soonest-expiry batch first,
   the expiring report, cross-warehouse batch transfer, and — critically — an
-  untracked product still receiving/selling with zero batch involvement. (Serial-
-  number tracking, where each unit is individually identified, is a planned
-  follow-up; this covers the batch/lot/expiry side.)
+  untracked product still receiving/selling with zero batch involvement.
+- Serial-number tracking: a product flagged `track_serial` is received against one
+  serial number per unit (`SerialUnit` rows), and every outbound movement draws
+  units automatically — sales/POS/invoice-confirm pick the oldest in-stock serials
+  (FIFO) with no per-unit input, or a caller can name exact serials. Selling/removing
+  a unit flips it to `out` and records the document it left on (`reference`), so a
+  serial can be traced for warranty/recall via `/serial-units/?serial_number=<sn>`;
+  transfers just re-home the unit. Quantities must be whole numbers, and duplicate or
+  already-registered serials are rejected. Serial and batch tracking are mutually
+  exclusive (serial takes precedence). Goods receipts capture serials per line.
+  Verified by tests (9): count-must-match-quantity, whole-number guard, duplicate/
+  clash rejection, auto-FIFO sale marking units out with the sale reference, explicit-
+  serial stock-out, cross-warehouse transfer keeping a unit in stock, and the
+  warranty-lookup API. Flutter: a serial-numbers box on the stock-in/adjustment sheet
+  for serial-tracked products (one per line), alongside a serial toggle on the product
+  form.
 - Barcode lookup: `GET /products/lookup/?barcode=<code>` resolves a scanned code to a
   single product by exact match on the product's barcode, falling back to a variant
   barcode (returning the parent product and which variant matched) — the scanner's

@@ -6,7 +6,7 @@ from django.db.models import F
 
 from apps.notifications.services import notify_low_stock
 
-from .models import Batch, BatchStock, StockItem, StockMovement
+from .models import Batch, BatchStock, SerialUnit, StockItem, StockMovement
 
 
 def _get_or_create_stock_item(company, warehouse, product, variant):
@@ -16,10 +16,63 @@ def _get_or_create_stock_item(company, warehouse, product, variant):
     return stock_item
 
 
+def _is_serial_tracked(product) -> bool:
+    return product.track_serial
+
+
 def _is_batch_tracked(product) -> bool:
     """Expiry tracking implies a batch to attach the date to, so either flag
-    makes a product batch-tracked."""
-    return product.track_batch or product.track_expiry
+    makes a product batch-tracked -- unless it's serial-tracked, in which case
+    per-unit serials take over (the two schemes are mutually exclusive)."""
+    return (product.track_batch or product.track_expiry) and not product.track_serial
+
+
+def _require_whole_quantity(product, quantity):
+    if quantity != quantity.to_integral_value():
+        raise ValidationError(f"{product.name} is serial-tracked; quantity must be a whole number.")
+    return int(quantity)
+
+
+def _receive_serials(company, warehouse, product, quantity, serial_numbers, reference):
+    """Create one IN_STOCK SerialUnit per serial. Requires exactly `quantity`
+    distinct serials, none already on record for this product."""
+    count = _require_whole_quantity(product, quantity)
+    serials = [s.strip() for s in (serial_numbers or []) if s and s.strip()]
+    if len(serials) != count:
+        raise ValidationError(f"{product.name} needs exactly {count} serial number(s); got {len(serials)}.")
+    if len(set(serials)) != len(serials):
+        raise ValidationError("Duplicate serial numbers in the request.")
+    clashes = SerialUnit.objects.filter(company=company, product=product, serial_number__in=serials)
+    if clashes.exists():
+        raise ValidationError(f"Serial number(s) already on record: {', '.join(sorted(c.serial_number for c in clashes))}.")
+    SerialUnit.objects.bulk_create([
+        SerialUnit(company=company, product=product, serial_number=s, warehouse=warehouse,
+                   status=SerialUnit.Status.IN_STOCK, reference=reference)
+        for s in serials
+    ])
+
+
+def _select_serials(company, warehouse, product, quantity, serial_numbers):
+    """Pick the SerialUnits to move out of a warehouse: the explicit ones if
+    given (must be in stock here), else the oldest in-stock units (FIFO)."""
+    count = _require_whole_quantity(product, quantity)
+    in_stock = SerialUnit.objects.select_for_update().filter(
+        company=company, warehouse=warehouse, product=product, status=SerialUnit.Status.IN_STOCK,
+    )
+    explicit = [s.strip() for s in (serial_numbers or []) if s and s.strip()]
+    if explicit:
+        units = list(in_stock.filter(serial_number__in=explicit))
+        found = {u.serial_number for u in units}
+        missing = set(explicit) - found
+        if missing:
+            raise ValidationError(f"Serial(s) not in stock at this warehouse: {', '.join(sorted(missing))}.")
+        if len(units) != count:
+            raise ValidationError(f"Provide exactly {count} serial number(s) to match the quantity.")
+        return units
+    units = list(in_stock.order_by("created_at")[:count])
+    if len(units) < count:
+        raise ValidationError(f"Only {len(units)} serialized unit(s) in stock; need {count}.")
+    return units
 
 
 def _receive_batch(company, warehouse, product, quantity, batch_number, expiry_date) -> Batch:
@@ -73,12 +126,14 @@ def _single_batch(consumed):
 
 @transaction.atomic
 def stock_in(*, company, warehouse, product, variant=None, quantity, unit_cost=Decimal("0"),
-             reference="", reason="", user=None, batch_number=None, expiry_date=None):
+             reference="", reason="", user=None, batch_number=None, expiry_date=None, serial_numbers=None):
     if quantity <= 0:
         raise ValidationError("Quantity must be positive.")
 
     batch = None
-    if _is_batch_tracked(product):
+    if _is_serial_tracked(product):
+        _receive_serials(company, warehouse, product, quantity, serial_numbers, reference)
+    elif _is_batch_tracked(product):
         if not batch_number:
             raise ValidationError(f"{product.name} is batch-tracked; a batch number is required.")
         if product.track_expiry and not expiry_date:
@@ -103,7 +158,8 @@ def stock_in(*, company, warehouse, product, variant=None, quantity, unit_cost=D
 
 
 @transaction.atomic
-def stock_out(*, company, warehouse, product, variant=None, quantity, reference="", reason="", user=None):
+def stock_out(*, company, warehouse, product, variant=None, quantity, reference="", reason="", user=None,
+              serial_numbers=None):
     if quantity <= 0:
         raise ValidationError("Quantity must be positive.")
 
@@ -113,11 +169,19 @@ def stock_out(*, company, warehouse, product, variant=None, quantity, reference=
             f"Insufficient stock: available {stock_item.available_quantity}, requested {quantity}."
         )
 
-    # Batch-tracked goods are drawn earliest-expiry-first. Sales/POS/invoice
-    # flows call stock_out with no batch info and get FEFO automatically -- they
-    # don't need to know about batches at all.
+    # Serial- and batch-tracked goods are drawn automatically (serials FIFO by
+    # receipt, batches earliest-expiry-first) so sales/POS/invoice flows call
+    # stock_out with no per-unit info and it just works -- they never need to
+    # know about serials or batches.
     batch = None
-    if _is_batch_tracked(product):
+    if _is_serial_tracked(product):
+        units = _select_serials(company, warehouse, product, quantity, serial_numbers)
+        for unit in units:
+            unit.status = SerialUnit.Status.OUT
+            unit.warehouse = None
+            unit.reference = reference
+        SerialUnit.objects.bulk_update(units, ["status", "warehouse", "reference"])
+    elif _is_batch_tracked(product):
         batch = _single_batch(_consume_batches_fefo(company, warehouse, product, quantity))
 
     stock_item.quantity_on_hand -= quantity
@@ -135,7 +199,7 @@ def stock_out(*, company, warehouse, product, variant=None, quantity, reference=
 
 @transaction.atomic
 def transfer_stock(*, company, from_warehouse, to_warehouse, product, variant=None,
-                    quantity, reference="", reason="", user=None):
+                    quantity, reference="", reason="", user=None, serial_numbers=None):
     if from_warehouse == to_warehouse:
         raise ValidationError("Source and destination warehouse must differ.")
 
@@ -147,10 +211,16 @@ def transfer_stock(*, company, from_warehouse, to_warehouse, product, variant=No
         )
     unit_cost = source_item.average_cost
 
-    # Carry the actual batches across so the destination's batch balances (and
-    # expiry dates) stay correct, not just the aggregate quantity.
+    # Carry the actual serials/batches across so the destination's per-unit and
+    # per-batch balances stay correct, not just the aggregate quantity.
     batch = None
-    if _is_batch_tracked(product):
+    if _is_serial_tracked(product):
+        units = _select_serials(company, from_warehouse, product, quantity, serial_numbers)
+        for unit in units:
+            unit.warehouse = to_warehouse
+            unit.reference = reference
+        SerialUnit.objects.bulk_update(units, ["warehouse", "reference"])
+    elif _is_batch_tracked(product):
         consumed = _consume_batches_fefo(company, from_warehouse, product, quantity)
         for moved_batch, moved_qty in consumed:
             dest_batch_stock, _ = BatchStock.objects.select_for_update().get_or_create(
@@ -187,7 +257,7 @@ def transfer_stock(*, company, from_warehouse, to_warehouse, product, variant=No
 
 @transaction.atomic
 def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, reason="", user=None,
-                 batch_number=None, expiry_date=None):
+                 batch_number=None, expiry_date=None, serial_numbers=None):
     if quantity_delta == 0:
         raise ValidationError("Adjustment quantity cannot be zero.")
 
@@ -196,7 +266,17 @@ def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, r
         raise ValidationError("Adjustment would result in negative stock.")
 
     batch = None
-    if _is_batch_tracked(product):
+    if _is_serial_tracked(product):
+        if quantity_delta > 0:
+            _receive_serials(company, warehouse, product, quantity_delta, serial_numbers, reason or "Adjustment")
+        else:
+            units = _select_serials(company, warehouse, product, -quantity_delta, serial_numbers)
+            for unit in units:
+                unit.status = SerialUnit.Status.OUT
+                unit.warehouse = None
+                unit.reference = reason or "Adjustment"
+            SerialUnit.objects.bulk_update(units, ["status", "warehouse", "reference"])
+    elif _is_batch_tracked(product):
         if quantity_delta > 0:
             if not batch_number:
                 raise ValidationError(f"{product.name} is batch-tracked; a batch number is required.")

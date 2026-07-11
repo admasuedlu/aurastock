@@ -36,6 +36,7 @@ class ProductRepository {
     String barcode = '',
     bool trackBatch = false,
     bool trackExpiry = false,
+    bool trackSerial = false,
     bool isBundle = false,
   }) async {
     final response = await _dio.post('/products/', data: {
@@ -48,6 +49,7 @@ class ProductRepository {
       if (barcode.isNotEmpty) 'barcode': barcode,
       'track_batch': trackBatch,
       'track_expiry': trackExpiry,
+      'track_serial': trackSerial,
       if (isBundle) 'product_type': 'bundle',
     });
     return Product.fromJson(response.data as Map<String, dynamic>);

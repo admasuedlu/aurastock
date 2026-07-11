@@ -31,6 +31,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
   final _referenceController = TextEditingController();
   final _reasonController = TextEditingController();
   final _batchController = TextEditingController();
+  final _serialsController = TextEditingController();
   String? _productId;
   String? _warehouseId;
   String? _toWarehouseId;
@@ -44,11 +45,19 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
     _referenceController.dispose();
     _reasonController.dispose();
     _batchController.dispose();
+    _serialsController.dispose();
     super.dispose();
   }
 
   static String _iso(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Split the serials box (one per line or comma-separated) into a clean list.
+  List<String> _serials() => _serialsController.text
+      .split(RegExp(r'[\n,]'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
 
   String _title(AppLocalizations l10n) {
     switch (widget.type) {
@@ -83,6 +92,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             reason: _reasonController.text.trim(),
             batchNumber: _batchController.text.trim(),
             expiryDate: _expiryDate == null ? null : _iso(_expiryDate!),
+            serialNumbers: _serials(),
           );
           break;
         case StockActionType.stockOut:
@@ -112,6 +122,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             reason: _reasonController.text.trim(),
             batchNumber: _batchController.text.trim(),
             expiryDate: _expiryDate == null ? null : _iso(_expiryDate!),
+            serialNumbers: _serials(),
           );
           break;
       }
@@ -144,10 +155,11 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
         break;
       }
     }
-    final showBatch = selectedProduct != null &&
-        selectedProduct.isBatchTracked &&
-        (widget.type == StockActionType.stockIn || isAdjustment);
+    final onInboundPath = widget.type == StockActionType.stockIn || isAdjustment;
+    final showBatch = selectedProduct != null && selectedProduct.isBatchTracked && onInboundPath;
     final showExpiry = showBatch && selectedProduct.trackExpiry;
+    // Serial capture applies to receiving/positive adjustment; sales use auto-FIFO.
+    final showSerials = selectedProduct != null && selectedProduct.isSerialTracked && onInboundPath;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -250,6 +262,19 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
                   },
                   icon: const Icon(Icons.event_outlined),
                   label: Text(_expiryDate == null ? 'Set expiry date' : 'Expiry: ${_iso(_expiryDate!)}'),
+                ),
+              ),
+            ],
+            if (showSerials) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _serialsController,
+                minLines: 2,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Serial numbers',
+                  helperText: 'One per line (or comma-separated) — must match the quantity',
+                  alignLabelWithHint: true,
                 ),
               ),
             ],

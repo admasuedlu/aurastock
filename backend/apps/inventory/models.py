@@ -85,6 +85,31 @@ class BatchStock(CompanyScopedModel):
         return f"{self.batch.batch_number} @ {self.warehouse.code}: {self.quantity_on_hand}"
 
 
+class SerialUnit(CompanyScopedModel):
+    """One physical, individually-identified unit of a serial-tracked product.
+    Receiving creates one per serial number; selling/removing flips it to OUT
+    (recording the document it left on, for warranty/recall lookup);
+    transferring just changes its warehouse. The count of IN_STOCK units in a
+    warehouse mirrors that warehouse's StockItem quantity_on_hand."""
+
+    class Status(models.TextChoices):
+        IN_STOCK = "in_stock", "In stock"
+        OUT = "out", "Out"
+
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE, related_name="serial_units")
+    serial_number = models.CharField(max_length=120)
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, related_name="serial_units", null=True, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.IN_STOCK)
+    reference = models.CharField(max_length=100, blank=True, help_text="Last movement document (receipt in, sale out)")
+
+    class Meta:
+        unique_together = ("company", "product", "serial_number")
+        ordering = ["serial_number"]
+
+    def __str__(self):
+        return f"{self.product.sku} #{self.serial_number}"
+
+
 class StockMovement(CompanyScopedModel):
     class MovementType(models.TextChoices):
         STOCK_IN = "stock_in", "Stock in"

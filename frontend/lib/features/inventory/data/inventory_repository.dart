@@ -38,6 +38,7 @@ class InventoryRepository {
     String reason = '',
     String? batchNumber,
     String? expiryDate,
+    List<String>? serialNumbers,
   }) {
     return _dio.post('/inventory/stock-in/', data: {
       'warehouse': warehouseId,
@@ -48,6 +49,7 @@ class InventoryRepository {
       'reason': reason,
       if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
       if (expiryDate != null) 'expiry_date': expiryDate,
+      if (serialNumbers != null && serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
     });
   }
 
@@ -92,6 +94,7 @@ class InventoryRepository {
     String reason = '',
     String? batchNumber,
     String? expiryDate,
+    List<String>? serialNumbers,
   }) {
     return _dio.post('/inventory/stock-adjustment/', data: {
       'warehouse': warehouseId,
@@ -100,6 +103,7 @@ class InventoryRepository {
       'reason': reason,
       if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
       if (expiryDate != null) 'expiry_date': expiryDate,
+      if (serialNumbers != null && serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
     });
   }
 }

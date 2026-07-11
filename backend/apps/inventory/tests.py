@@ -105,3 +105,97 @@ class BatchAPITests(TenantAPITestCase):
         numbers = {row["batch_number"] for row in resp.data["results"]}
         # B1 (5) fully consumed first via FEFO (same expiry, created first); B2 has 3 left
         self.assertEqual(numbers, {"B2"})
+
+
+class SerialTrackingTests(TenantAPITestCase):
+    def _serialized(self):
+        return self.make_product(sku="PHONE-1", track_serial=True)
+
+    def test_receive_requires_matching_serial_count(self):
+        wh = self.make_warehouse()
+        p = self._serialized()
+        with self.assertRaises(ValidationError):  # 2 serials for qty 3
+            self.receive_stock(p, wh, 3, unit_cost="100", serial_numbers=["A", "B"])
+
+    def test_quantity_must_be_whole(self):
+        wh = self.make_warehouse()
+        p = self._serialized()
+        with self.assertRaises(ValidationError):
+            self.receive_stock(p, wh, "2.5", unit_cost="100", serial_numbers=["A", "B"])
+
+    def test_duplicate_and_clashing_serials_rejected(self):
+        from apps.inventory.models import SerialUnit
+        wh = self.make_warehouse()
+        p = self._serialized()
+        with self.assertRaises(ValidationError):  # dupes within the request
+            self.receive_stock(p, wh, 2, unit_cost="100", serial_numbers=["A", "A"])
+        self.receive_stock(p, wh, 1, unit_cost="100", serial_numbers=["SN-1"])
+        with self.assertRaises(ValidationError):  # SN-1 already on record
+            self.receive_stock(p, wh, 1, unit_cost="100", serial_numbers=["SN-1"])
+        self.assertEqual(SerialUnit.objects.filter(product=p).count(), 1)
+
+    def test_receive_creates_in_stock_units(self):
+        from apps.inventory.models import SerialUnit
+        wh = self.make_warehouse()
+        p = self._serialized()
+        self.receive_stock(p, wh, 3, unit_cost="100", serial_numbers=["S1", "S2", "S3"])
+        self.assertEqual(SerialUnit.objects.filter(
+            product=p, warehouse=wh, status=SerialUnit.Status.IN_STOCK).count(), 3)
+        self.assertEqual(StockItem.objects.get(company=self.company, warehouse=wh, product=p).quantity_on_hand,
+                         Decimal("3.000"))
+
+    def test_sale_auto_selects_and_marks_out(self):
+        from apps.inventory.models import SerialUnit
+        wh = self.make_warehouse()
+        p = self._serialized()
+        self.receive_stock(p, wh, 3, unit_cost="100", serial_numbers=["S1", "S2", "S3"])
+        # Sales path passes no serial info -> auto FIFO pick of 2.
+        stock_out(company=self.company, warehouse=wh, product=p, quantity=Decimal("2"),
+                  reference="INV-001", user=self.user)
+        self.assertEqual(SerialUnit.objects.filter(product=p, status=SerialUnit.Status.IN_STOCK).count(), 1)
+        out_units = SerialUnit.objects.filter(product=p, status=SerialUnit.Status.OUT)
+        self.assertEqual(out_units.count(), 2)
+        self.assertTrue(all(u.warehouse_id is None and u.reference == "INV-001" for u in out_units))
+
+    def test_explicit_serial_stock_out(self):
+        from apps.inventory.models import SerialUnit
+        wh = self.make_warehouse()
+        p = self._serialized()
+        self.receive_stock(p, wh, 3, unit_cost="100", serial_numbers=["S1", "S2", "S3"])
+        stock_out(company=self.company, warehouse=wh, product=p, quantity=Decimal("1"),
+                  serial_numbers=["S2"], reference="INV-9", user=self.user)
+        self.assertEqual(SerialUnit.objects.get(product=p, serial_number="S2").status, SerialUnit.Status.OUT)
+        self.assertEqual(SerialUnit.objects.filter(
+            product=p, serial_number__in=["S1", "S3"], status=SerialUnit.Status.IN_STOCK).count(), 2)
+
+    def test_transfer_moves_serial_to_destination_warehouse(self):
+        from apps.inventory.models import SerialUnit
+        src = self.make_warehouse(code="WH1")
+        dst = self.make_warehouse(code="WH2", name="Second")
+        p = self._serialized()
+        self.receive_stock(p, src, 2, unit_cost="100", serial_numbers=["S1", "S2"])
+        transfer_stock(company=self.company, from_warehouse=src, to_warehouse=dst,
+                       product=p, quantity=Decimal("1"), serial_numbers=["S1"], user=self.user)
+        moved = SerialUnit.objects.get(product=p, serial_number="S1")
+        self.assertEqual(moved.warehouse_id, dst.id)
+        self.assertEqual(moved.status, SerialUnit.Status.IN_STOCK)
+
+    def test_insufficient_serials_blocks_stock_out(self):
+        wh = self.make_warehouse()
+        p = self._serialized()
+        self.receive_stock(p, wh, 1, unit_cost="100", serial_numbers=["S1"])
+        with self.assertRaises(ValidationError):
+            stock_out(company=self.company, warehouse=wh, product=p, quantity=Decimal("2"), user=self.user)
+
+    def test_serial_units_api_supports_warranty_lookup(self):
+        wh = self.make_warehouse()
+        p = self._serialized()
+        self.receive_stock(p, wh, 2, unit_cost="100", serial_numbers=["S1", "S2"])
+        stock_out(company=self.company, warehouse=wh, product=p, quantity=Decimal("1"),
+                  serial_numbers=["S1"], reference="INV-77", user=self.user)
+        resp = self.client.get("/api/v1/serial-units/", {"serial_number": "S1"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["count"], 1)
+        row = resp.data["results"][0]
+        self.assertEqual(row["status"], "out")
+        self.assertEqual(row["reference"], "INV-77")
