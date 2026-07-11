@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.platform",
     "apps.portal",
+    "apps.payments",
 ]
 
 MIDDLEWARE = [
@@ -185,6 +186,10 @@ else:
     EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
     EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="notifications@aurastock.local")
+
+# Shared secret the sandbox payment provider signs/verifies webhooks with. A real
+# gateway would use that provider's own signing secret from its dashboard.
+PAYMENTS_SANDBOX_SECRET = config("PAYMENTS_SANDBOX_SECRET", default="sandbox-secret")
 
 if LOCAL_DEV_MODE:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}

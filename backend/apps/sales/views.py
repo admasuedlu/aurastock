@@ -12,6 +12,7 @@ from apps.core.numbering import next_value
 from apps.core.viewsets import CompanyScopedViewSet
 from apps.inventory.models import Warehouse
 from apps.inventory.services import stock_out
+from apps.sales import services as sales_services
 
 from .models import Invoice, InvoiceItem, Quotation, SalesOrder, SalesOrderItem, SalesPayment
 from .serializers import (
@@ -217,25 +218,16 @@ class InvoiceViewSet(CompanyScopedViewSet):
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=True, methods=["post"], url_path="record-payment")
-    @transaction.atomic
     def record_payment(self, request, pk=None):
         invoice = self.get_object()
-        if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PARTIALLY_PAID):
-            raise DRFValidationError("Only confirmed invoices can receive payments.")
-
         serializer = SalesPaymentSerializer(data={**request.data, "invoice": invoice.id})
         serializer.is_valid(raise_exception=True)
-        amount = serializer.validated_data["amount"]
-        if amount <= 0:
-            raise DRFValidationError("Payment amount must be positive.")
-        if invoice.amount_paid + amount > invoice.total:
-            raise DRFValidationError("Payment exceeds the outstanding balance.")
-
-        payment = serializer.save(company=invoice.company, created_by=request.user)
-        invoice.amount_paid += amount
-        invoice.status = (
-            Invoice.Status.PAID if invoice.amount_paid >= invoice.total else Invoice.Status.PARTIALLY_PAID
-        )
-        invoice.save(update_fields=["amount_paid", "status", "updated_at"])
-        accounting_services.record_sales_payment(payment, invoice)
+        data = serializer.validated_data
+        try:
+            sales_services.record_invoice_payment(
+                invoice, amount=data["amount"], method=data.get("method", "cash"),
+                reference=data.get("reference", ""), user=request.user,
+            )
+        except DjangoValidationError as exc:
+            raise DRFValidationError(exc.messages if hasattr(exc, "messages") else str(exc))
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)

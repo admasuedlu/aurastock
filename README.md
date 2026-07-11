@@ -76,7 +76,8 @@ There's a Django test suite (no extra dependencies — the built-in runner) cove
 the core invariants: weighted-average costing, insufficient-stock guards, batch/lot
 FEFO and the expiring-batches report, serial-number tracking (receipt, auto-FIFO
 sale, transfer, warranty lookup), bundle/kit assembly (component consumption +
-cost blending), quotation→order→invoice conversion and partial
+cost blending), the sandbox payment-gateway flow (intent → signed webhook →
+recorded payment, idempotent), quotation→order→invoice conversion and partial
 invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
 approval state machine, goods-receipt stock updates and over-receiving guard,
 journal-entry balancing and period-end close, and cross-tenant isolation / plan-limit
@@ -281,6 +282,22 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   simplification: closing entries land on "today" rather than a
   user-chosen period end, so there's no way to close out, say, just June —
   only "everything up to now."
+- Online payment gateway (scaffolding): a provider abstraction where a real
+  gateway drops in as one class. `POST /payment-intents/` creates a pending intent
+  for a confirmed invoice and returns a checkout URL for the payer; a signed
+  webhook (`POST /payments/webhook/<provider>/`) — or, in the sandbox, a
+  staff-triggered `simulate-callback` — confirms it, which records the actual
+  SalesPayment and posts the ledger entry through the **same** shared sales
+  service the manual record-payment endpoint now uses. Confirmation is
+  idempotent (a provider re-delivering a webhook won't double-charge), amounts
+  can't exceed the balance, and the webhook rejects a bad or missing HMAC-SHA256
+  signature. **Only a sandbox provider is implemented** — there are no live
+  Telebirr/CBE/Stripe merchant credentials or a public callback URL in this
+  project, so a real gateway can't be exercised here; the sandbox mints a fake
+  checkout URL and verifies webhooks exactly as a real one would, so the flow and
+  its security are genuinely tested (9 tests). Flutter: a "Pay online (sandbox)"
+  button on the invoice sheet that creates the intent, shows the checkout link,
+  and can simulate the payer completing it.
 - Reports: sales summary (today/month/period totals + a daily series, combining
   confirmed-or-later invoices and completed POS transactions — the two things that
   actually represent a sale), purchase summary (the same today/month/period +
@@ -456,9 +473,10 @@ original spec. Notifications only fire from `stock_out()`, not from `adjust_stoc
 `transfer_stock()`, so a manual stock adjustment or transfer that drops a product below
 its reorder level doesn't raise an alert (a human doing that adjustment already sees
 the number they typed); SMS/WhatsApp delivery is architected for but not implemented,
-per the note above. Also not built: actual Ethiopian payment
-gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
-*methods*, not live merchant integrations), the Ethiopian calendar UI, per-role gating
+per the note above. Also not built: live Ethiopian payment
+gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — there's a provider abstraction and
+a fully-tested sandbox provider, but no live merchant integration, since that needs
+credentials and a public callback URL this project doesn't have), the Ethiopian calendar UI, per-role gating
 of who may approve a purchase request (the workflow exists but any authenticated tenant
 user can approve — the app enforces no granular per-endpoint role checks yet), receipt
 printing / physical

@@ -102,4 +102,16 @@ class SalesRepository {
     });
     return Invoice.fromJson(response.data as Map<String, dynamic>);
   }
+
+  /// Creates an online payment intent for an invoice; returns the raw intent
+  /// (including its `id` and `checkout_url`).
+  Future<Map<String, dynamic>> createPaymentIntent(String invoiceId, {String method = 'telebirr'}) async {
+    final response = await _dio.post('/payment-intents/', data: {'invoice': invoiceId, 'method': method});
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Sandbox only: pretend the gateway reported the payer finished checkout.
+  Future<void> simulatePaymentCallback(String intentId) {
+    return _dio.post('/payment-intents/$intentId/simulate-callback/');
+  }
 }

@@ -70,6 +70,61 @@ class _InvoiceActionsSheetState extends ConsumerState<_InvoiceActionsSheet> {
     }
   }
 
+  Future<void> _payOnline() async {
+    setState(() => _busy = true);
+    Map<String, dynamic> intent;
+    try {
+      intent = await ref.read(salesRepositoryProvider).createPaymentIntent(widget.invoice.id);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    final pay = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Online payment (sandbox)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('A real gateway would send the customer to this checkout link. '
+                'There is no live provider here, so you can simulate the payer completing it.'),
+            const SizedBox(height: 12),
+            SelectableText(intent['checkout_url'] as String? ?? '',
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Simulate payment')),
+        ],
+      ),
+    );
+    if (pay != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(salesRepositoryProvider).simulatePaymentCallback(intent['id'] as String);
+      ref.invalidate(invoiceListProvider);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment recorded (sandbox).')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
@@ -109,12 +164,19 @@ class _InvoiceActionsSheetState extends ConsumerState<_InvoiceActionsSheet> {
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text('Confirm invoice (deducts stock)'),
                 ),
-              if (invoice.status == 'confirmed' || invoice.status == 'partially_paid')
+              if (invoice.status == 'confirmed' || invoice.status == 'partially_paid') ...[
                 FilledButton.icon(
                   onPressed: _recordPayment,
                   icon: const Icon(Icons.payments_outlined),
                   label: const Text('Record payment'),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _payOnline,
+                  icon: const Icon(Icons.link_outlined),
+                  label: const Text('Pay online (sandbox)'),
+                ),
+              ],
               if (invoice.status == 'paid')
                 const Text('This invoice is fully paid.'),
             ],
