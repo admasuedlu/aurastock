@@ -42,6 +42,44 @@ class _SellingView extends ConsumerStatefulWidget {
 }
 
 class _SellingViewState extends ConsumerState<_SellingView> {
+  Future<void> _scanBarcode() async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Scan / enter barcode'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: 'Barcode'),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Add')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (code == null || code.isEmpty) return;
+    try {
+      final product = await ref.read(productRepositoryProvider).lookupByBarcode(code);
+      if (!mounted) return;
+      if (product == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No product for barcode $code.')));
+        return;
+      }
+      ref.read(cartControllerProvider.notifier).addProduct(
+            productId: product.id, productName: product.name, sku: product.sku,
+            unitPrice: product.sellingPrice, taxPercent: 15,
+          );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added ${product.name}.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productListProvider);
@@ -60,6 +98,11 @@ class _SellingViewState extends ConsumerState<_SellingView> {
                   decoration: const InputDecoration(hintText: 'Search products', prefixIcon: Icon(Icons.search)),
                   onChanged: (value) => ref.read(productSearchProvider.notifier).state = value,
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.qr_code_scanner_outlined),
+                tooltip: 'Scan barcode',
+                onPressed: _scanBarcode,
               ),
               IconButton(
                 icon: const Icon(Icons.receipt_long_outlined),

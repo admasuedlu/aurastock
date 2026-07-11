@@ -33,6 +33,7 @@ class ProductRepository {
     required double costPrice,
     required double sellingPrice,
     required double reorderLevel,
+    String barcode = '',
     bool trackBatch = false,
     bool trackExpiry = false,
     bool isBundle = false,
@@ -44,11 +45,24 @@ class ProductRepository {
       'cost_price': costPrice,
       'selling_price': sellingPrice,
       'reorder_level': reorderLevel,
+      if (barcode.isNotEmpty) 'barcode': barcode,
       'track_batch': trackBatch,
       'track_expiry': trackExpiry,
       if (isBundle) 'product_type': 'bundle',
     });
     return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Resolve a scanned barcode to a product (exact match on the product or a
+  /// variant barcode). Returns null when nothing matches (the endpoint 404s).
+  Future<Product?> lookupByBarcode(String code) async {
+    try {
+      final response = await _dio.get('/products/lookup/', queryParameters: {'barcode': code});
+      return Product.fromJson(response.data['product'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   Future<List<BundleComponent>> fetchBundleComponents(String bundleId) async {

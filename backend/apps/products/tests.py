@@ -2,10 +2,10 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 
-from apps.core.test_utils import TenantAPITestCase
+from apps.core.test_utils import TenantAPITestCase, make_company
 from apps.inventory.models import StockItem
 from apps.inventory.services import assemble_bundle
-from apps.products.models import BundleComponent, Product
+from apps.products.models import BundleComponent, Product, ProductVariant, UnitOfMeasure
 
 
 class KittingTests(TenantAPITestCase):
@@ -68,3 +68,39 @@ class KittingTests(TenantAPITestCase):
 
         product = self.client.get(f"/api/v1/products/{self.box.id}/").data
         self.assertEqual(len(product["components"]), 2)
+
+
+class BarcodeLookupTests(TenantAPITestCase):
+    def test_lookup_by_product_barcode(self):
+        self.make_product(name="Widget", sku="W-1", barcode="6001234567890")
+        resp = self.client.get("/api/v1/products/lookup/", {"barcode": "6001234567890"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["product"]["sku"], "W-1")
+        self.assertIsNone(resp.data["variant_id"])
+
+    def test_lookup_falls_back_to_variant_barcode(self):
+        product = self.make_product(name="Shirt", sku="SH-1")
+        variant = ProductVariant.objects.create(
+            company=self.company, product=product, sku="SH-1-M", barcode="7001112223334",
+        )
+        resp = self.client.get("/api/v1/products/lookup/", {"barcode": "7001112223334"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["product"]["sku"], "SH-1")
+        self.assertEqual(resp.data["variant_id"], str(variant.id))
+
+    def test_unknown_barcode_returns_404(self):
+        resp = self.client.get("/api/v1/products/lookup/", {"barcode": "0000000000000"})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_missing_barcode_returns_400(self):
+        resp = self.client.get("/api/v1/products/lookup/", {"barcode": "  "})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_lookup_is_tenant_scoped(self):
+        # Another tenant owns this barcode -> not found for us.
+        other_company, _ = make_company("Other Co")
+        other_uom = UnitOfMeasure.objects.create(company=other_company, name="Piece", symbol="pc")
+        Product.objects.create(company=other_company, name="Theirs", sku="T-1",
+                               unit=other_uom, barcode="9009009009009")
+        resp = self.client.get("/api/v1/products/lookup/", {"barcode": "9009009009009"})
+        self.assertEqual(resp.status_code, 404)

@@ -160,6 +160,14 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   untracked product still receiving/selling with zero batch involvement. (Serial-
   number tracking, where each unit is individually identified, is a planned
   follow-up; this covers the batch/lot/expiry side.)
+- Barcode lookup: `GET /products/lookup/?barcode=<code>` resolves a scanned code to a
+  single product by exact match on the product's barcode, falling back to a variant
+  barcode (returning the parent product and which variant matched) — the scanner's
+  scan→product step, distinct from the fuzzy `?search=`. Tenant-scoped (another
+  tenant's barcode 404s), 400 on empty, 404 when nothing matches. Flutter: a barcode
+  field on the product form and a scan button in the POS header that looks the code up
+  and drops the product straight into the cart. (The lookup API is the software half;
+  physical USB/camera scanner hardware isn't wired.)
 - Real-time stock updates over WebSocket (JWT-authenticated) for dashboard/warehouse screens
 - Customers and suppliers (basic CRM/vendor records with credit limit / payment terms)
 - Sales: quotations (convertible to a sales order, copying line items and locking the

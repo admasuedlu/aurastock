@@ -22,6 +22,7 @@ class _ProductFormSheet extends ConsumerStatefulWidget {
 class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _barcodeController = TextEditingController();
   final _costController = TextEditingController(text: '0');
   final _priceController = TextEditingController(text: '0');
   final _reorderController = TextEditingController(text: '0');
@@ -35,6 +36,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _barcodeController.dispose();
     _costController.dispose();
     _priceController.dispose();
     _reorderController.dispose();
@@ -49,6 +51,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             name: _nameController.text.trim(),
             categoryId: _categoryId,
             unitId: _unitId!,
+            barcode: _barcodeController.text.trim(),
             costPrice: double.tryParse(_costController.text) ?? 0,
             sellingPrice: double.tryParse(_priceController.text) ?? 0,
             reorderLevel: double.tryParse(_reorderController.text) ?? 0,
@@ -92,6 +95,15 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Product name'),
               validator: (v) => (v == null || v.isEmpty) ? l10n.requiredField : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _barcodeController,
+              decoration: const InputDecoration(
+                labelText: 'Barcode (optional)',
+                prefixIcon: Icon(Icons.qr_code_2_outlined),
+              ),
+              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
             categoriesAsync.when(

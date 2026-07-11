@@ -1,3 +1,7 @@
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.response import Response
+
 from apps.core.viewsets import CompanyScopedViewSet
 
 from .models import Brand, BundleComponent, Category, Product, ProductVariant, UnitOfMeasure
@@ -37,6 +41,34 @@ class ProductViewSet(CompanyScopedViewSet):
     filterset_fields = ["category", "brand", "product_type", "is_active"]
     search_fields = ["name", "sku", "barcode"]
     ordering_fields = ["name", "created_at", "selling_price"]
+
+    @action(detail=False, methods=["get"])
+    def lookup(self, request):
+        """Resolve a scanned barcode to a single product. Exact match on the
+        product's own barcode, falling back to a variant barcode (returning the
+        parent product plus which variant matched). This is the scanner's
+        scan->product step, distinct from the fuzzy `?search=` filter."""
+        code = request.query_params.get("barcode", "").strip()
+        if not code:
+            raise DRFValidationError({"barcode": "A barcode is required."})
+
+        product = self.get_queryset().filter(barcode=code).first()
+        variant_id = None
+        if product is None:
+            variant = (
+                ProductVariant.objects
+                .filter(company_id=request.user.company_id, barcode=code)
+                .select_related("product").first()
+            )
+            if variant is not None:
+                product, variant_id = variant.product, variant.id
+
+        if product is None:
+            return Response({"detail": "No product found for that barcode."}, status=404)
+        return Response({
+            "product": ProductSerializer(product).data,
+            "variant_id": str(variant_id) if variant_id else None,
+        })
 
 
 class ProductVariantViewSet(CompanyScopedViewSet):
