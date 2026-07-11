@@ -70,6 +70,20 @@ python manage.py seed_plans
 python manage.py runserver
 ```
 
+Running the backend tests
+-------------------------
+There's a Django test suite (no extra dependencies — the built-in runner) covering
+the core invariants: weighted-average costing, insufficient-stock guards, batch/lot
+FEFO and the expiring-batches report, quotation→order→invoice conversion and partial
+invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
+approval state machine, goods-receipt stock updates and over-receiving guard,
+journal-entry balancing and period-end close, and cross-tenant isolation / plan-limit
+/ suspension enforcement.
+
+```
+USE_SQLITE=True python manage.py test apps
+```
+
 To operate the platform itself (tenant list, suspensions, plan management), create
 a platform-level admin — tenant signup can't produce one, since it always creates
 a company:
