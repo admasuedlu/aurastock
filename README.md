@@ -138,12 +138,31 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   path). Flutter: tapping a sales order opens an actions sheet with a warehouse
   picker and a per-line quantity editor pre-filled with each line's outstanding
   amount, so staff can bill the whole remainder or a partial slice.
-- Purchasing: purchase orders with line items; goods receipts against a PO (full or
-  partial) add stock via the same inventory service and auto-update PO status
-  (draft → sent → approved → partially_received → received); over-receiving is
-  blocked; payments against a PO track amount paid / balance due independently of
-  receiving (you can pay a supplier before, during, or after goods arrive);
-  overpayment is blocked
+- Purchasing: an optional **purchase-request → approval → order** workflow sits
+  upstream of the PO (the buy-side precursor stage, the way a quotation precedes a
+  sales order). A request is raised (supplier optional at this point), submitted for
+  approval, then approved or rejected — approve/reject record who actioned it and
+  when, and a rejection captures a reason; only a *submitted* request can be
+  approved/rejected and only an *approved* one can be converted, each guarded with a
+  clear error. Converting an approved request creates a real PO, copies the line
+  items, links back via `PurchaseOrder.purchase_request`, and locks the request as
+  `converted` (the supplier comes from the request if it has one, otherwise the
+  converter supplies it). Then: purchase orders with line items; goods receipts
+  against a PO (full or partial) add stock via the same inventory service and
+  auto-update PO status (draft → sent → approved → partially_received → received);
+  over-receiving is blocked; payments against a PO track amount paid / balance due
+  independently of receiving (you can pay a supplier before, during, or after goods
+  arrive); overpayment is blocked. The request workflow is verified via curl (26
+  checks: the full draft→submitted→approved→converted happy path plus the rejection
+  path, every illegal transition rejected with 400, the audit fields populated, the
+  PO linked back and totals matching, and conversion working both from the request's
+  own supplier and a supplier chosen at convert time). Flutter: a Requests tab on the
+  Purchasing screen with a create sheet (optional supplier + line items) and an
+  actions sheet whose buttons follow the state machine — Submit, then Approve/Reject
+  with a reason field, then Convert to Purchase Order (prompting for a supplier when
+  the request has none). Note: who may approve isn't yet gated by a specific role
+  permission — the app doesn't enforce granular per-endpoint role checks anywhere
+  yet, so approval is open to any authenticated tenant user for now
 - POS: a cashier opens a till session against a warehouse with an opening cash float;
   ringing up a sale deducts stock immediately (no separate confirm step, unlike
   invoices); refunding a completed sale restores stock **at the cost it left at**
@@ -372,8 +391,10 @@ its reorder level doesn't raise an alert (a human doing that adjustment already 
 the number they typed); SMS/WhatsApp delivery is architected for but not implemented,
 per the note above. Also not built: actual Ethiopian payment
 gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — currently just selectable payment
-*methods*, not live merchant integrations), the Ethiopian calendar UI, purchase
-requests/approvals workflow, receipt printing / physical
+*methods*, not live merchant integrations), the Ethiopian calendar UI, per-role gating
+of who may approve a purchase request (the workflow exists but any authenticated tenant
+user can approve — the app enforces no granular per-endpoint role checks yet), receipt
+printing / physical
 cash-drawer / barcode-scanner hardware integration, offline-mode sync for POS, closing to a
 user-chosen fiscal period end rather than always "everything up to now" (see
 the Accounting note above), and a real Celery beat schedule (the

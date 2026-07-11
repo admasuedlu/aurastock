@@ -7,7 +7,15 @@ from apps.accounting import services as accounting_services
 from apps.core.numbering import next_value
 from apps.inventory.services import stock_in
 
-from .models import GoodsReceipt, GoodsReceiptItem, PurchaseOrder, PurchaseOrderItem, PurchasePayment
+from .models import (
+    GoodsReceipt,
+    GoodsReceiptItem,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchasePayment,
+    PurchaseRequest,
+    PurchaseRequestItem,
+)
 
 
 class PurchaseOrderItemSerializer(serializers.ModelSerializer):
@@ -32,11 +40,14 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrder
         fields = [
-            "id", "number", "supplier", "supplier_name", "status", "order_date", "expected_date",
-            "notes", "subtotal", "discount_total", "tax_total", "total", "amount_paid", "balance_due",
-            "items", "created_at",
+            "id", "number", "supplier", "supplier_name", "purchase_request", "status", "order_date",
+            "expected_date", "notes", "subtotal", "discount_total", "tax_total", "total", "amount_paid",
+            "balance_due", "items", "created_at",
         ]
-        read_only_fields = ["number", "status", "subtotal", "discount_total", "tax_total", "total", "amount_paid"]
+        read_only_fields = [
+            "number", "status", "subtotal", "discount_total", "tax_total", "total", "amount_paid",
+            "purchase_request",
+        ]
 
     def create(self, validated_data):
         items_data = validated_data.pop("items")
@@ -127,3 +138,43 @@ class PurchasePaymentSerializer(serializers.ModelSerializer):
         model = PurchasePayment
         fields = ["id", "purchase_order", "amount", "method", "reference", "paid_at"]
         read_only_fields = ["paid_at"]
+
+
+class PurchaseRequestItemSerializer(serializers.ModelSerializer):
+    line_total = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+
+    class Meta:
+        model = PurchaseRequestItem
+        fields = ["id", "product", "product_name", "variant", "quantity", "unit_price",
+                  "discount_percent", "tax_percent", "line_total"]
+
+
+class PurchaseRequestSerializer(serializers.ModelSerializer):
+    items = PurchaseRequestItemSerializer(many=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True, default=None)
+    requested_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True, default=None)
+    approved_by_name = serializers.CharField(source="approved_by.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model = PurchaseRequest
+        fields = [
+            "id", "number", "supplier", "supplier_name", "status", "request_date", "expected_date",
+            "notes", "subtotal", "discount_total", "tax_total", "total", "requested_by_name",
+            "approved_by_name", "approved_at", "rejection_reason", "items", "created_at",
+        ]
+        read_only_fields = [
+            "number", "status", "subtotal", "discount_total", "tax_total", "total",
+            "approved_at", "rejection_reason",
+        ]
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        company = validated_data["company"]
+        validated_data["number"] = next_value(company, "purchase_request", default_prefix="PR-")
+        purchase_request = PurchaseRequest.objects.create(**validated_data)
+        items = [PurchaseRequestItem(company=company, purchase_request=purchase_request, **item) for item in items_data]
+        PurchaseRequestItem.objects.bulk_create(items)
+        purchase_request.recalculate_totals(items)
+        purchase_request.save(update_fields=["subtotal", "discount_total", "tax_total", "total"])
+        return purchase_request

@@ -11,3 +11,7 @@ final purchasingRepositoryProvider = Provider<PurchasingRepository>((ref) {
 final purchaseOrderListProvider = FutureProvider.autoDispose<List<PurchaseOrder>>((ref) {
   return ref.watch(purchasingRepositoryProvider).fetchPurchaseOrders();
 });
+
+final purchaseRequestListProvider = FutureProvider.autoDispose<List<PurchaseRequest>>((ref) {
+  return ref.watch(purchasingRepositoryProvider).fetchPurchaseRequests();
+});

@@ -51,4 +51,48 @@ class PurchasingRepository {
     });
     return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
   }
+
+  Future<List<PurchaseRequest>> fetchPurchaseRequests() async {
+    final response = await _dio.get('/purchase-requests/');
+    final results = response.data['results'] as List;
+    return results.map((e) => PurchaseRequest.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<PurchaseRequest> createPurchaseRequest({
+    String? supplierId,
+    required List<LineItemDraft> items,
+  }) async {
+    final response = await _dio.post('/purchase-requests/', data: {
+      if (supplierId != null) 'supplier': supplierId,
+      'items': items
+          .where((i) => i.isValid)
+          .map((i) => {'product': i.productId, 'quantity': i.quantity, 'unit_price': i.unitPrice})
+          .toList(),
+    });
+    return PurchaseRequest.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<PurchaseRequest> submitPurchaseRequest(String id) async {
+    final response = await _dio.post('/purchase-requests/$id/submit/');
+    return PurchaseRequest.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<PurchaseRequest> approvePurchaseRequest(String id) async {
+    final response = await _dio.post('/purchase-requests/$id/approve/');
+    return PurchaseRequest.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<PurchaseRequest> rejectPurchaseRequest(String id, {required String reason}) async {
+    final response = await _dio.post('/purchase-requests/$id/reject/', data: {'reason': reason});
+    return PurchaseRequest.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Converts an approved request to a PO. [supplierId] is required only when
+  /// the request itself has no supplier set.
+  Future<PurchaseOrder> convertRequestToPo(String id, {String? supplierId}) async {
+    final response = await _dio.post('/purchase-requests/$id/convert-to-po/', data: {
+      if (supplierId != null) 'supplier': supplierId,
+    });
+    return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
+  }
 }

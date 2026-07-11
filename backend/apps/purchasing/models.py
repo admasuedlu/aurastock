@@ -17,6 +17,10 @@ class PurchaseOrder(_Document):
 
     number = models.CharField(max_length=30)
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="purchase_orders")
+    purchase_request = models.ForeignKey(
+        "purchasing.PurchaseRequest", on_delete=models.SET_NULL, related_name="purchase_orders",
+        null=True, blank=True,
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     order_date = models.DateField(auto_now_add=True)
     expected_date = models.DateField(null=True, blank=True)
@@ -80,3 +84,48 @@ class PurchasePayment(CompanyScopedModel):
 
     class Meta:
         ordering = ["-paid_at"]
+
+
+class PurchaseRequest(_Document):
+    """An internal request to buy, sitting upstream of a purchase order. It
+    runs through an approval workflow (draft -> submitted -> approved/rejected)
+    before an approved request can be converted into an actual PO -- the buy
+    side's precursor stage, the way a quotation precedes a sales order.
+    `created_by` (from _Document) is the requester; supplier is optional at
+    request time and can be chosen when converting to a PO."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CONVERTED = "converted", "Converted"
+        CANCELLED = "cancelled", "Cancelled"
+
+    number = models.CharField(max_length=30)
+    supplier = models.ForeignKey(
+        "suppliers.Supplier", on_delete=models.PROTECT, related_name="purchase_requests",
+        null=True, blank=True,
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    request_date = models.DateField(auto_now_add=True)
+    expected_date = models.DateField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        help_text="Who approved or rejected the request",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        unique_together = ("company", "number")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.number
+
+
+class PurchaseRequestItem(_LineItem):
+    purchase_request = models.ForeignKey(PurchaseRequest, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="+")
+    variant = models.ForeignKey("products.ProductVariant", on_delete=models.PROTECT, related_name="+", null=True, blank=True)
