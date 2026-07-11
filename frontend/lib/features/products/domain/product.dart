@@ -29,6 +29,8 @@ class Product {
     required this.costPrice,
     required this.sellingPrice,
     required this.reorderLevel,
+    required this.trackBatch,
+    required this.trackExpiry,
     required this.isActive,
   });
 
@@ -43,6 +45,8 @@ class Product {
       costPrice: double.tryParse(json['cost_price'].toString()) ?? 0,
       sellingPrice: double.tryParse(json['selling_price'].toString()) ?? 0,
       reorderLevel: double.tryParse(json['reorder_level'].toString()) ?? 0,
+      trackBatch: json['track_batch'] as bool? ?? false,
+      trackExpiry: json['track_expiry'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
     );
   }
@@ -56,5 +60,9 @@ class Product {
   final double costPrice;
   final double sellingPrice;
   final double reorderLevel;
+  final bool trackBatch;
+  final bool trackExpiry;
   final bool isActive;
+
+  bool get isBatchTracked => trackBatch || trackExpiry;
 }

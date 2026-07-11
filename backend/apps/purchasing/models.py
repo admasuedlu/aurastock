@@ -72,6 +72,8 @@ class GoodsReceiptItem(CompanyScopedModel):
     variant = models.ForeignKey("products.ProductVariant", on_delete=models.PROTECT, related_name="+", null=True, blank=True)
     quantity = models.DecimalField(max_digits=14, decimal_places=3)
     unit_cost = models.DecimalField(max_digits=14, decimal_places=4)
+    batch_number = models.CharField(max_length=100, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
 
 
 class PurchasePayment(CompanyScopedModel):

@@ -2,10 +2,11 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 
 from apps.notifications.services import notify_low_stock
 
-from .models import StockItem, StockMovement
+from .models import Batch, BatchStock, StockItem, StockMovement
 
 
 def _get_or_create_stock_item(company, warehouse, product, variant):
@@ -15,11 +16,74 @@ def _get_or_create_stock_item(company, warehouse, product, variant):
     return stock_item
 
 
+def _is_batch_tracked(product) -> bool:
+    """Expiry tracking implies a batch to attach the date to, so either flag
+    makes a product batch-tracked."""
+    return product.track_batch or product.track_expiry
+
+
+def _receive_batch(company, warehouse, product, quantity, batch_number, expiry_date) -> Batch:
+    """Get-or-create the Batch and add `quantity` to its per-warehouse stock."""
+    batch, _ = Batch.objects.get_or_create(
+        company=company, product=product, batch_number=batch_number,
+        defaults={"expiry_date": expiry_date},
+    )
+    if expiry_date and batch.expiry_date != expiry_date:
+        batch.expiry_date = expiry_date
+        batch.save(update_fields=["expiry_date"])
+    batch_stock, _ = BatchStock.objects.select_for_update().get_or_create(
+        company=company, warehouse=warehouse, product=product, batch=batch,
+    )
+    batch_stock.quantity_on_hand += quantity
+    batch_stock.save(update_fields=["quantity_on_hand"])
+    return batch
+
+
+def _consume_batches_fefo(company, warehouse, product, quantity):
+    """Draw `quantity` from a product's batches in a warehouse, earliest expiry
+    first (undated batches last). Returns the list of (Batch, qty_consumed)."""
+    stocks = list(
+        BatchStock.objects.select_for_update()
+        .filter(company=company, warehouse=warehouse, product=product, quantity_on_hand__gt=0)
+        .select_related("batch")
+        .order_by(F("batch__expiry_date").asc(nulls_last=True), "batch__created_at")
+    )
+    remaining = quantity
+    consumed = []
+    for batch_stock in stocks:
+        if remaining <= 0:
+            break
+        take = min(batch_stock.quantity_on_hand, remaining)
+        batch_stock.quantity_on_hand -= take
+        batch_stock.save(update_fields=["quantity_on_hand"])
+        remaining -= take
+        consumed.append((batch_stock.batch, take))
+    if remaining > 0:
+        raise ValidationError(
+            f"Insufficient batch stock for {product.name}: short by {remaining}."
+        )
+    return consumed
+
+
+def _single_batch(consumed):
+    """The batch to stamp on a movement -- the one batch consumed, or None if
+    FEFO spanned several (the per-batch balances still capture what moved)."""
+    return consumed[0][0] if len(consumed) == 1 else None
+
+
 @transaction.atomic
 def stock_in(*, company, warehouse, product, variant=None, quantity, unit_cost=Decimal("0"),
-             reference="", reason="", user=None):
+             reference="", reason="", user=None, batch_number=None, expiry_date=None):
     if quantity <= 0:
         raise ValidationError("Quantity must be positive.")
+
+    batch = None
+    if _is_batch_tracked(product):
+        if not batch_number:
+            raise ValidationError(f"{product.name} is batch-tracked; a batch number is required.")
+        if product.track_expiry and not expiry_date:
+            raise ValidationError(f"{product.name} tracks expiry; an expiry date is required.")
+        batch = _receive_batch(company, warehouse, product, quantity, batch_number, expiry_date)
 
     stock_item = _get_or_create_stock_item(company, warehouse, product, variant)
     existing_value = stock_item.quantity_on_hand * stock_item.average_cost
@@ -34,7 +98,7 @@ def stock_in(*, company, warehouse, product, variant=None, quantity, unit_cost=D
     return StockMovement.objects.create(
         company=company, warehouse=warehouse, product=product, variant=variant,
         movement_type=StockMovement.MovementType.STOCK_IN, quantity=quantity,
-        unit_cost=unit_cost, reference=reference, reason=reason, created_by=user,
+        unit_cost=unit_cost, reference=reference, reason=reason, created_by=user, batch=batch,
     )
 
 
@@ -48,6 +112,14 @@ def stock_out(*, company, warehouse, product, variant=None, quantity, reference=
         raise ValidationError(
             f"Insufficient stock: available {stock_item.available_quantity}, requested {quantity}."
         )
+
+    # Batch-tracked goods are drawn earliest-expiry-first. Sales/POS/invoice
+    # flows call stock_out with no batch info and get FEFO automatically -- they
+    # don't need to know about batches at all.
+    batch = None
+    if _is_batch_tracked(product):
+        batch = _single_batch(_consume_batches_fefo(company, warehouse, product, quantity))
+
     stock_item.quantity_on_hand -= quantity
     stock_item.save(update_fields=["quantity_on_hand", "updated_at"])
 
@@ -57,7 +129,7 @@ def stock_out(*, company, warehouse, product, variant=None, quantity, reference=
     return StockMovement.objects.create(
         company=company, warehouse=warehouse, product=product, variant=variant,
         movement_type=StockMovement.MovementType.STOCK_OUT, quantity=quantity,
-        unit_cost=stock_item.average_cost, reference=reference, reason=reason, created_by=user,
+        unit_cost=stock_item.average_cost, reference=reference, reason=reason, created_by=user, batch=batch,
     )
 
 
@@ -74,6 +146,20 @@ def transfer_stock(*, company, from_warehouse, to_warehouse, product, variant=No
             f"requested {quantity}."
         )
     unit_cost = source_item.average_cost
+
+    # Carry the actual batches across so the destination's batch balances (and
+    # expiry dates) stay correct, not just the aggregate quantity.
+    batch = None
+    if _is_batch_tracked(product):
+        consumed = _consume_batches_fefo(company, from_warehouse, product, quantity)
+        for moved_batch, moved_qty in consumed:
+            dest_batch_stock, _ = BatchStock.objects.select_for_update().get_or_create(
+                company=company, warehouse=to_warehouse, product=product, batch=moved_batch,
+            )
+            dest_batch_stock.quantity_on_hand += moved_qty
+            dest_batch_stock.save(update_fields=["quantity_on_hand"])
+        batch = _single_batch(consumed)
+
     source_item.quantity_on_hand -= quantity
     source_item.save(update_fields=["quantity_on_hand", "updated_at"])
 
@@ -89,24 +175,36 @@ def transfer_stock(*, company, from_warehouse, to_warehouse, product, variant=No
     out_movement = StockMovement.objects.create(
         company=company, warehouse=from_warehouse, related_warehouse=to_warehouse,
         product=product, variant=variant, movement_type=StockMovement.MovementType.TRANSFER_OUT,
-        quantity=quantity, unit_cost=unit_cost, reference=reference, reason=reason, created_by=user,
+        quantity=quantity, unit_cost=unit_cost, reference=reference, reason=reason, created_by=user, batch=batch,
     )
     StockMovement.objects.create(
         company=company, warehouse=to_warehouse, related_warehouse=from_warehouse,
         product=product, variant=variant, movement_type=StockMovement.MovementType.TRANSFER_IN,
-        quantity=quantity, unit_cost=unit_cost, reference=reference, reason=reason, created_by=user,
+        quantity=quantity, unit_cost=unit_cost, reference=reference, reason=reason, created_by=user, batch=batch,
     )
     return out_movement
 
 
 @transaction.atomic
-def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, reason="", user=None):
+def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, reason="", user=None,
+                 batch_number=None, expiry_date=None):
     if quantity_delta == 0:
         raise ValidationError("Adjustment quantity cannot be zero.")
 
     stock_item = _get_or_create_stock_item(company, warehouse, product, variant)
     if quantity_delta < 0 and stock_item.quantity_on_hand + quantity_delta < 0:
         raise ValidationError("Adjustment would result in negative stock.")
+
+    batch = None
+    if _is_batch_tracked(product):
+        if quantity_delta > 0:
+            if not batch_number:
+                raise ValidationError(f"{product.name} is batch-tracked; a batch number is required.")
+            if product.track_expiry and not expiry_date:
+                raise ValidationError(f"{product.name} tracks expiry; an expiry date is required.")
+            batch = _receive_batch(company, warehouse, product, quantity_delta, batch_number, expiry_date)
+        else:
+            batch = _single_batch(_consume_batches_fefo(company, warehouse, product, -quantity_delta))
 
     stock_item.quantity_on_hand += quantity_delta
     stock_item.save(update_fields=["quantity_on_hand", "updated_at"])
@@ -118,5 +216,5 @@ def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, r
     return StockMovement.objects.create(
         company=company, warehouse=warehouse, product=product, variant=variant,
         movement_type=movement_type, quantity=abs(quantity_delta),
-        unit_cost=stock_item.average_cost, reason=reason, created_by=user,
+        unit_cost=stock_item.average_cost, reason=reason, created_by=user, batch=batch,
     )

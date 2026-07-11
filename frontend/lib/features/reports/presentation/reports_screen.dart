@@ -11,7 +11,7 @@ class ReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(AppLocalizations.of(context).reports),
@@ -23,11 +23,15 @@ class ReportsScreen extends StatelessWidget {
               Tab(text: 'Purchases'),
               Tab(text: 'Inventory Valuation'),
               Tab(text: 'Dead Stock'),
+              Tab(text: 'Expiring'),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [_TopProductsTab(), _AbcTab(), _PurchasesTab(), _ValuationTab(), _DeadStockTab()],
+          children: [
+            _TopProductsTab(), _AbcTab(), _PurchasesTab(),
+            _ValuationTab(), _DeadStockTab(), _ExpiringTab(),
+          ],
         ),
       ),
     );
@@ -299,6 +303,49 @@ class _DeadStockTab extends ConsumerWidget {
                   '${row.lastSoldAt == null ? "never sold" : "last sold ${row.lastSoldAt!.substring(0, 10)}"}',
                 ),
                 trailing: Text(currency.format(row.value)),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ExpiringTab extends ConsumerWidget {
+  const _ExpiringTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final expiringAsync = ref.watch(expiringBatchesProvider);
+    final today = DateTime.now();
+
+    return expiringAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => Center(child: Text(l10n.errorGeneric)),
+      data: (rows) {
+        if (rows.isEmpty) {
+          return const Center(child: Text('No batches expiring in the next 30 days.'));
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final row = rows[index];
+            final expiry = DateTime.tryParse(row.expiryDate);
+            final expired = expiry != null && expiry.isBefore(DateTime(today.year, today.month, today.day));
+            final color = expired ? Colors.red : Colors.orange;
+            return Card(
+              child: ListTile(
+                leading: Icon(expired ? Icons.dangerous_outlined : Icons.schedule_outlined, color: color),
+                title: Text('${row.productName} · ${row.batchNumber}'),
+                subtitle: Text(
+                  '${row.productSku} · ${row.quantityOnHand.toStringAsFixed(0)} on hand · '
+                  '${expired ? "expired" : "expires"} ${row.expiryDate}',
+                  style: TextStyle(color: color),
+                ),
               ),
             );
           },

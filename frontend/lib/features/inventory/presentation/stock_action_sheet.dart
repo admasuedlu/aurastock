@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../products/domain/product.dart';
 import '../../products/providers/product_providers.dart';
 import '../providers/inventory_providers.dart';
 
@@ -29,9 +30,11 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
   final _unitCostController = TextEditingController(text: '0');
   final _referenceController = TextEditingController();
   final _reasonController = TextEditingController();
+  final _batchController = TextEditingController();
   String? _productId;
   String? _warehouseId;
   String? _toWarehouseId;
+  DateTime? _expiryDate;
   bool _submitting = false;
 
   @override
@@ -40,8 +43,12 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
     _unitCostController.dispose();
     _referenceController.dispose();
     _reasonController.dispose();
+    _batchController.dispose();
     super.dispose();
   }
+
+  static String _iso(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   String _title(AppLocalizations l10n) {
     switch (widget.type) {
@@ -74,6 +81,8 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             unitCost: double.tryParse(_unitCostController.text) ?? 0,
             reference: _referenceController.text.trim(),
             reason: _reasonController.text.trim(),
+            batchNumber: _batchController.text.trim(),
+            expiryDate: _expiryDate == null ? null : _iso(_expiryDate!),
           );
           break;
         case StockActionType.stockOut:
@@ -101,6 +110,8 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             productId: _productId!,
             quantityDelta: quantity,
             reason: _reasonController.text.trim(),
+            batchNumber: _batchController.text.trim(),
+            expiryDate: _expiryDate == null ? null : _iso(_expiryDate!),
           );
           break;
       }
@@ -123,6 +134,20 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
     final productsAsync = ref.watch(productListProvider);
     final warehousesAsync = ref.watch(warehouseListProvider);
     final isAdjustment = widget.type == StockActionType.adjustment;
+
+    // Batch capture only applies to batch-tracked products on the inbound
+    // paths (receiving / positive adjustment); sales & FEFO handle the rest.
+    Product? selectedProduct;
+    for (final p in (productsAsync.valueOrNull ?? const <Product>[])) {
+      if (p.id == _productId) {
+        selectedProduct = p;
+        break;
+      }
+    }
+    final showBatch = selectedProduct != null &&
+        selectedProduct.isBatchTracked &&
+        (widget.type == StockActionType.stockIn || isAdjustment);
+    final showExpiry = showBatch && selectedProduct.trackExpiry;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -196,6 +221,36 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
               TextFormField(
                 controller: _referenceController,
                 decoration: InputDecoration(labelText: l10n.reference),
+              ),
+            ],
+            if (showBatch) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _batchController,
+                decoration: const InputDecoration(
+                  labelText: 'Batch / lot number',
+                  helperText: 'Required for this batch-tracked product',
+                ),
+              ),
+            ],
+            if (showExpiry) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _expiryDate ?? now,
+                      firstDate: DateTime(now.year - 1),
+                      lastDate: DateTime(now.year + 20),
+                    );
+                    if (picked != null && mounted) setState(() => _expiryDate = picked);
+                  },
+                  icon: const Icon(Icons.event_outlined),
+                  label: Text(_expiryDate == null ? 'Set expiry date' : 'Expiry: ${_iso(_expiryDate!)}'),
+                ),
               ),
             ],
             const SizedBox(height: 16),

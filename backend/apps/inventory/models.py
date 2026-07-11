@@ -50,6 +50,41 @@ class StockItem(CompanyScopedModel):
         return self.quantity_on_hand - self.reserved_quantity
 
 
+class Batch(CompanyScopedModel):
+    """A lot/batch of a product, optionally with an expiry date. Identified by
+    its number within a product; created on receipt of batch-tracked goods.
+    Per-warehouse on-hand quantity lives in BatchStock."""
+
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE, related_name="batches")
+    batch_number = models.CharField(max_length=100)
+    expiry_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("company", "product", "batch_number")
+        ordering = ["expiry_date", "batch_number"]
+
+    def __str__(self):
+        return f"{self.product.sku} · {self.batch_number}"
+
+
+class BatchStock(CompanyScopedModel):
+    """On-hand quantity of a specific batch in a specific warehouse. The sum of
+    a product's BatchStock in a warehouse mirrors that warehouse's StockItem
+    quantity_on_hand for batch-tracked products; it just says *which* batches
+    make it up, for traceability and first-expiry-first-out picking."""
+
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name="batch_stocks")
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE, related_name="batch_stocks")
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name="stocks")
+    quantity_on_hand = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("0"))
+
+    class Meta:
+        unique_together = ("company", "warehouse", "product", "batch")
+
+    def __str__(self):
+        return f"{self.batch.batch_number} @ {self.warehouse.code}: {self.quantity_on_hand}"
+
+
 class StockMovement(CompanyScopedModel):
     class MovementType(models.TextChoices):
         STOCK_IN = "stock_in", "Stock in"
@@ -60,6 +95,10 @@ class StockMovement(CompanyScopedModel):
         ADJUSTMENT_REMOVE = "adjustment_remove", "Adjustment (remove)"
 
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name="movements")
+    batch = models.ForeignKey(
+        Batch, on_delete=models.SET_NULL, related_name="movements", null=True, blank=True,
+        help_text="Set when the movement is entirely one batch (blank if it spanned several via FEFO)",
+    )
     related_warehouse = models.ForeignKey(
         Warehouse, on_delete=models.SET_NULL, related_name="related_movements", null=True, blank=True,
         help_text="Other side of a transfer",

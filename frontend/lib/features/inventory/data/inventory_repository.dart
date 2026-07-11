@@ -36,6 +36,8 @@ class InventoryRepository {
     required double unitCost,
     String reference = '',
     String reason = '',
+    String? batchNumber,
+    String? expiryDate,
   }) {
     return _dio.post('/inventory/stock-in/', data: {
       'warehouse': warehouseId,
@@ -44,6 +46,8 @@ class InventoryRepository {
       'unit_cost': unitCost,
       'reference': reference,
       'reason': reason,
+      if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
+      if (expiryDate != null) 'expiry_date': expiryDate,
     });
   }
 
@@ -86,12 +90,16 @@ class InventoryRepository {
     required String productId,
     required double quantityDelta,
     String reason = '',
+    String? batchNumber,
+    String? expiryDate,
   }) {
     return _dio.post('/inventory/stock-adjustment/', data: {
       'warehouse': warehouseId,
       'product': productId,
       'quantity_delta': quantityDelta,
       'reason': reason,
+      if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
+      if (expiryDate != null) 'expiry_date': expiryDate,
     });
   }
 }

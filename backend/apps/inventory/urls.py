@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path
 
 from .views import (
+    BatchViewSet,
     StockAdjustmentView,
     StockInView,
     StockItemViewSet,
@@ -16,6 +17,7 @@ router = DefaultRouter()
 router.register("warehouses", WarehouseViewSet, basename="warehouse")
 router.register("stock-items", StockItemViewSet, basename="stock-item")
 router.register("stock-movements", StockMovementViewSet, basename="stock-movement")
+router.register("batches", BatchViewSet, basename="batch")
 
 urlpatterns = [
     path("inventory/stock-in/", StockInView.as_view(), name="stock-in"),

@@ -31,3 +31,7 @@ final inventoryValuationProvider = FutureProvider.autoDispose<InventoryValuation
 final deadStockProvider = FutureProvider.autoDispose<List<DeadStockRow>>((ref) {
   return ref.watch(reportsRepositoryProvider).fetchDeadStock();
 });
+
+final expiringBatchesProvider = FutureProvider.autoDispose<List<ExpiringBatchRow>>((ref) {
+  return ref.watch(reportsRepositoryProvider).fetchExpiringBatches();
+});

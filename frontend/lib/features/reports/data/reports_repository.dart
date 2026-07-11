@@ -37,4 +37,12 @@ class ReportsRepository {
     final rows = response.data['rows'] as List;
     return rows.map((e) => DeadStockRow.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  /// Batches on hand within [days] of expiry (or already expired), soonest
+  /// first. Served by the inventory app's /batches/expiring/ endpoint.
+  Future<List<ExpiringBatchRow>> fetchExpiringBatches({int days = 30}) async {
+    final response = await _dio.get('/batches/expiring/', queryParameters: {'days': days});
+    final results = response.data['results'] as List;
+    return results.map((e) => ExpiringBatchRow.fromJson(e as Map<String, dynamic>)).toList();
+  }
 }

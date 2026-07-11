@@ -116,6 +116,22 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   auto-generated SKUs (per-company numbering sequences, reusable for invoices/POs later)
 - Inventory: warehouses, stock in/out/transfer/adjustment with weighted-average
   costing, insufficient-stock guards, low-stock querying, and full movement history
+- Batch / lot tracking with expiry dates: a product flagged `track_batch` (or
+  `track_expiry`) is received against a batch number (and expiry), and every
+  outbound movement draws stock **first-expiry-first-out (FEFO)** automatically —
+  so the sales, POS, and invoice-confirm paths get batch consumption for free
+  without knowing batches exist. Per-batch, per-warehouse balances are kept in a
+  `BatchStock` table (transfers carry the actual batch across, not just the
+  quantity), the `batch` a movement drew from is stamped on the `StockMovement`
+  for traceability/recalls, and an `/batches/expiring/` report surfaces stock
+  nearing or past expiry. Costing stays weighted-average (independent of which
+  batch left), so COGS is unchanged. Fully backward-compatible: untracked products
+  need no batch and behave exactly as before. Verified via curl (13 checks): batch
+  + expiry required on receipt, FEFO consuming the soonest-expiry batch first,
+  the expiring report, cross-warehouse batch transfer, and — critically — an
+  untracked product still receiving/selling with zero batch involvement. (Serial-
+  number tracking, where each unit is individually identified, is a planned
+  follow-up; this covers the batch/lot/expiry side.)
 - Real-time stock updates over WebSocket (JWT-authenticated) for dashboard/warehouse screens
 - Customers and suppliers (basic CRM/vendor records with credit limit / payment terms)
 - Sales: quotations (convertible to a sales order, copying line items and locking the
@@ -148,7 +164,8 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   items, links back via `PurchaseOrder.purchase_request`, and locks the request as
   `converted` (the supplier comes from the request if it has one, otherwise the
   converter supplies it). Then: purchase orders with line items; goods receipts
-  against a PO (full or partial) add stock via the same inventory service and
+  against a PO (full or partial) add stock via the same inventory service (a receipt
+  line can carry a batch number + expiry for batch-tracked products) and
   auto-update PO status (draft → sent → approved → partially_received → received);
   over-receiving is blocked; payments against a PO track amount paid / balance due
   independently of receiving (you can pay a supplier before, during, or after goods

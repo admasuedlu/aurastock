@@ -109,6 +109,32 @@ class AbcAnalysis {
   final List<AbcRow> rows;
 }
 
+class ExpiringBatchRow {
+  ExpiringBatchRow({
+    required this.productName,
+    required this.productSku,
+    required this.batchNumber,
+    required this.expiryDate,
+    required this.quantityOnHand,
+  });
+
+  factory ExpiringBatchRow.fromJson(Map<String, dynamic> json) {
+    return ExpiringBatchRow(
+      productName: json['product_name'] as String? ?? '',
+      productSku: json['product_sku'] as String? ?? '',
+      batchNumber: json['batch_number'] as String? ?? '',
+      expiryDate: json['expiry_date'] as String? ?? '',
+      quantityOnHand: double.tryParse(json['quantity_on_hand'].toString()) ?? 0,
+    );
+  }
+
+  final String productName;
+  final String productSku;
+  final String batchNumber;
+  final String expiryDate;
+  final double quantityOnHand;
+}
+
 class TopProductRow {
   TopProductRow({required this.productName, required this.productSku, required this.quantitySold, required this.revenue});
 

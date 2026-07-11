@@ -27,6 +27,8 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
   final _reorderController = TextEditingController(text: '0');
   String? _categoryId;
   String? _unitId;
+  bool _trackBatch = false;
+  bool _trackExpiry = false;
   bool _submitting = false;
 
   @override
@@ -49,6 +51,8 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             costPrice: double.tryParse(_costController.text) ?? 0,
             sellingPrice: double.tryParse(_priceController.text) ?? 0,
             reorderLevel: double.tryParse(_reorderController.text) ?? 0,
+            trackBatch: _trackBatch,
+            trackExpiry: _trackExpiry,
           );
       ref.invalidate(productListProvider);
       if (mounted) Navigator.of(context).pop();
@@ -139,6 +143,27 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
               controller: _reorderController,
               decoration: InputDecoration(labelText: l10n.reorderLevel),
               keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Track batches / lots'),
+              subtitle: const Text('Receive and sell this product by batch number'),
+              value: _trackBatch,
+              onChanged: (v) => setState(() {
+                _trackBatch = v;
+                if (!v) _trackExpiry = false;
+              }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Track expiry dates'),
+              subtitle: const Text('Sell earliest-expiry batches first (FEFO)'),
+              value: _trackExpiry,
+              onChanged: (v) => setState(() {
+                _trackExpiry = v;
+                if (v) _trackBatch = true;
+              }),
             ),
             const SizedBox(height: 24),
             FilledButton(

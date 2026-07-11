@@ -33,6 +33,8 @@ class ProductRepository {
     required double costPrice,
     required double sellingPrice,
     required double reorderLevel,
+    bool trackBatch = false,
+    bool trackExpiry = false,
   }) async {
     final response = await _dio.post('/products/', data: {
       'name': name,
@@ -41,6 +43,8 @@ class ProductRepository {
       'cost_price': costPrice,
       'selling_price': sellingPrice,
       'reorder_level': reorderLevel,
+      'track_batch': trackBatch,
+      'track_expiry': trackExpiry,
     });
     return Product.fromJson(response.data as Map<String, dynamic>);
   }
