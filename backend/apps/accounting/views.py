@@ -17,6 +17,7 @@ from .serializers import (
 class AccountViewSet(CompanyScopedViewSet):
     queryset = Account.objects.select_related("parent").all()
     serializer_class = AccountSerializer
+    permission_module = "accounting"
     filterset_fields = ["account_type", "is_active"]
     search_fields = ["code", "name"]
 
@@ -36,12 +37,14 @@ class JournalEntryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
 class ExpenseCategoryViewSet(CompanyScopedViewSet):
     queryset = ExpenseCategory.objects.all()
     serializer_class = ExpenseCategorySerializer
+    permission_module = "accounting"
     search_fields = ["name"]
 
 
 class ExpenseViewSet(CompanyScopedViewSet):
     queryset = Expense.objects.select_related("category", "journal_entry").all()
     serializer_class = ExpenseSerializer
+    permission_module = "accounting"
     filterset_fields = ["category", "payment_method"]
 
     def perform_create(self, serializer):

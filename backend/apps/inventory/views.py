@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import HasModulePermission
 from apps.core.viewsets import CompanyScopedViewSet
 from apps.tenants.limits import enforce_plan_limit
 
@@ -47,6 +48,7 @@ def _broadcast_stock_change(company_id, stock_item):
 class WarehouseViewSet(CompanyScopedViewSet):
     queryset = Warehouse.objects.select_related("branch").all()
     serializer_class = WarehouseSerializer
+    permission_module = "warehouses"
     filterset_fields = ["branch", "is_active"]
     search_fields = ["name", "code"]
 
@@ -147,7 +149,9 @@ class SerialUnitViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
 
 
 class _StockActionView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    # Manual stock moves require inventory-write (POST -> "inventory.add").
+    permission_classes = [permissions.IsAuthenticated, HasModulePermission]
+    permission_module = "inventory"
     serializer_class = None
     service_fn = None
 
@@ -194,7 +198,8 @@ class AssembleView(_StockActionView):
 
 
 class StockTransferView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasModulePermission]
+    permission_module = "inventory"
 
     def post(self, request):
         serializer = StockTransferSerializer(data=request.data, context={"request": request})

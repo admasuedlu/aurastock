@@ -21,6 +21,7 @@ from .serializers import POSSessionSerializer, POSTransactionSerializer
 class POSSessionViewSet(CompanyScopedViewSet):
     queryset = POSSession.objects.select_related("warehouse", "cashier").all()
     serializer_class = POSSessionSerializer
+    permission_module = "pos"
     filterset_fields = ["warehouse", "status"]
 
     def perform_create(self, serializer):
@@ -64,6 +65,7 @@ class POSSessionViewSet(CompanyScopedViewSet):
 class POSTransactionViewSet(CompanyScopedViewSet):
     queryset = POSTransaction.objects.select_related("session", "customer").prefetch_related("items").all()
     serializer_class = POSTransactionSerializer
+    permission_module = "pos"
     filterset_fields = ["session", "customer", "status"]
 
     def perform_create(self, serializer):

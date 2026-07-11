@@ -18,6 +18,7 @@ from .serializers import (
 class CategoryViewSet(CompanyScopedViewSet):
     queryset = Category.objects.select_related("parent").all()
     serializer_class = CategorySerializer
+    permission_module = "products"
     filterset_fields = ["parent", "is_active"]
     search_fields = ["name"]
 
@@ -25,6 +26,7 @@ class CategoryViewSet(CompanyScopedViewSet):
 class BrandViewSet(CompanyScopedViewSet):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
+    permission_module = "products"
     filterset_fields = ["is_active"]
     search_fields = ["name"]
 
@@ -32,12 +34,14 @@ class BrandViewSet(CompanyScopedViewSet):
 class UnitOfMeasureViewSet(CompanyScopedViewSet):
     queryset = UnitOfMeasure.objects.all()
     serializer_class = UnitOfMeasureSerializer
+    permission_module = "products"
     search_fields = ["name", "symbol"]
 
 
 class ProductViewSet(CompanyScopedViewSet):
     queryset = Product.objects.select_related("category", "brand", "unit").prefetch_related("variants").all()
     serializer_class = ProductSerializer
+    permission_module = "products"
     filterset_fields = ["category", "brand", "product_type", "is_active"]
     search_fields = ["name", "sku", "barcode"]
     ordering_fields = ["name", "created_at", "selling_price"]
@@ -74,6 +78,7 @@ class ProductViewSet(CompanyScopedViewSet):
 class ProductVariantViewSet(CompanyScopedViewSet):
     queryset = ProductVariant.objects.select_related("product").all()
     serializer_class = ProductVariantSerializer
+    permission_module = "products"
     filterset_fields = ["product", "is_active"]
     search_fields = ["sku", "barcode"]
 
@@ -84,4 +89,5 @@ class BundleComponentViewSet(CompanyScopedViewSet):
 
     queryset = BundleComponent.objects.select_related("component", "bundle").all()
     serializer_class = BundleComponentSerializer
+    permission_module = "products"
     filterset_fields = ["bundle", "component"]

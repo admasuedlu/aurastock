@@ -59,6 +59,26 @@ class TenantAPITestCase(APITestCase):
     def make_supplier(self, name="Global Parts"):
         return Supplier.objects.create(company=self.company, name=name)
 
+    def make_user_with_role(self, role_name, client=None):
+        """Create an extra user in this company with one of the seeded starter
+        roles, and (optionally) point an APIClient at them. Returns the user."""
+        from django.contrib.auth import get_user_model
+
+        from apps.accounts.models import Role
+
+        User = get_user_model()
+        role = Role.objects.get(company=self.company, name=role_name)
+        global _email_seq
+        _email_seq += 1
+        user = User.objects.create_user(
+            username=f"{role_name.lower().replace(' ', '')}{_email_seq}",
+            email=f"staff{_email_seq}@example.test", password="StaffPass123!",
+            company=self.company, role=role,
+        )
+        if client is not None:
+            client.force_authenticate(user=user)
+        return user
+
     def receive_stock(self, product, warehouse, quantity, unit_cost="60", **kwargs):
         """Put stock on hand via the inventory service (handles batches too)."""
         return stock_in(

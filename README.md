@@ -80,8 +80,8 @@ cost blending), the sandbox payment-gateway flow (intent → signed webhook →
 recorded payment, idempotent), quotation→order→invoice conversion and partial
 invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
 approval state machine, goods-receipt stock updates and over-receiving guard,
-journal-entry balancing and period-end close, and cross-tenant isolation / plan-limit
-/ suspension enforcement.
+journal-entry balancing and period-end close, cross-tenant isolation / plan-limit
+/ suspension enforcement, and per-role permission gating.
 
 ```
 USE_SQLITE=True python manage.py test apps
@@ -129,6 +129,22 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
 - JWT auth (email + password), with automatic access-token refresh in the Flutter app
 - Row-level multi-tenant isolation (every tenant-scoped model carries a `company` FK;
   `CompanyScopedViewSet` filters and stamps it automatically)
+- Per-role permission enforcement: the seeded `module.action` catalog (e.g.
+  `sales.add`, `purchases.approve`, `accounting.change`) is now actually enforced
+  at the API. A `HasModulePermission` class — installed as a global default —
+  derives the required action from the HTTP method (safe→view, POST→add,
+  PUT/PATCH→change, DELETE→delete), with per-`@action` overrides (e.g. a purchase
+  request's approve/reject map to the `approve` permission, not generic write).
+  Business viewsets carry a `permission_module`; a view without one stays
+  unguarded, so it's an opt-in gate. Superusers pass; a user with no role is
+  denied any guarded action. The catalog is seeded by a data migration so grants
+  work in every environment (previously it only populated if someone ran
+  `seed_permissions`). Verified by tests (7): a Sales Person is blocked from
+  expenses / purchase orders / manual stock-in but can quote; an Accountant can
+  post expenses and read invoices but not quote; only the Procurement Officer (who
+  holds `purchases.approve`) can approve a purchase request; a roleless user is
+  denied. (Read endpoints that set their own `permission_classes` — inventory
+  levels, movements, journal entries — remain view-any-authenticated for now.)
 - Product catalog: categories, brands, units of measure, products, variants,
   auto-generated SKUs (per-company numbering sequences, reusable for invoices/POs later)
 - Composite items / kitting: a bundle product carries a bill of materials
@@ -228,9 +244,9 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   Purchasing screen with a create sheet (optional supplier + line items) and an
   actions sheet whose buttons follow the state machine — Submit, then Approve/Reject
   with a reason field, then Convert to Purchase Order (prompting for a supplier when
-  the request has none). Note: who may approve isn't yet gated by a specific role
-  permission — the app doesn't enforce granular per-endpoint role checks anywhere
-  yet, so approval is open to any authenticated tenant user for now
+  the request has none). Approving/rejecting requires the `purchases.approve`
+  permission (Owner/Admin/Procurement Officer) — see the per-role enforcement note
+  above.
 - POS: a cashier opens a till session against a warehouse with an opening cash float;
   ringing up a sale deducts stock immediately (no separate confirm step, unlike
   invoices); refunding a completed sale restores stock **at the cost it left at**
@@ -476,9 +492,7 @@ the number they typed); SMS/WhatsApp delivery is architected for but not impleme
 per the note above. Also not built: live Ethiopian payment
 gateway integrations (Telebirr/CBE Pay/M-Pesa/Amole — there's a provider abstraction and
 a fully-tested sandbox provider, but no live merchant integration, since that needs
-credentials and a public callback URL this project doesn't have), the Ethiopian calendar UI, per-role gating
-of who may approve a purchase request (the workflow exists but any authenticated tenant
-user can approve — the app enforces no granular per-endpoint role checks yet), receipt
+credentials and a public callback URL this project doesn't have), the Ethiopian calendar UI, receipt
 printing / physical
 cash-drawer / barcode-scanner hardware integration, offline-mode sync for POS, closing to a
 user-chosen fiscal period end rather than always "everything up to now" (see

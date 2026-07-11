@@ -28,6 +28,7 @@ _UNCONVERTIBLE_QUOTATION_STATUSES = (Quotation.Status.CONVERTED, Quotation.Statu
 class QuotationViewSet(CompanyScopedViewSet):
     queryset = Quotation.objects.select_related("customer").prefetch_related("items").all()
     serializer_class = QuotationSerializer
+    permission_module = "sales"
     filterset_fields = ["customer", "status"]
 
     def perform_create(self, serializer):
@@ -83,6 +84,7 @@ class QuotationViewSet(CompanyScopedViewSet):
 class SalesOrderViewSet(CompanyScopedViewSet):
     queryset = SalesOrder.objects.select_related("customer", "quotation").prefetch_related("items").all()
     serializer_class = SalesOrderSerializer
+    permission_module = "sales"
     filterset_fields = ["customer", "status"]
 
     def perform_create(self, serializer):
@@ -183,6 +185,7 @@ class SalesOrderViewSet(CompanyScopedViewSet):
 class InvoiceViewSet(CompanyScopedViewSet):
     queryset = Invoice.objects.select_related("customer", "warehouse", "sales_order").prefetch_related("items", "payments").all()
     serializer_class = InvoiceSerializer
+    permission_module = "sales"
     filterset_fields = ["customer", "status", "warehouse"]
 
     def perform_create(self, serializer):

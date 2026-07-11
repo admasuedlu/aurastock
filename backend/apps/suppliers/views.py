@@ -8,6 +8,7 @@ from .serializers import SupplierSerializer
 class SupplierViewSet(PortalAccessMixin, CompanyScopedViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
+    permission_module = "suppliers"
     filterset_fields = ["is_active"]
     search_fields = ["name", "phone", "email", "tin_number"]
     portal_owner_field = "supplier"

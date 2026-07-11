@@ -23,6 +23,7 @@ from .serializers import (
 class PurchaseOrderViewSet(CompanyScopedViewSet):
     queryset = PurchaseOrder.objects.select_related("supplier").prefetch_related("items").all()
     serializer_class = PurchaseOrderSerializer
+    permission_module = "purchases"
     filterset_fields = ["supplier", "status"]
 
     def perform_create(self, serializer):
@@ -60,6 +61,7 @@ class PurchaseOrderViewSet(CompanyScopedViewSet):
 class GoodsReceiptViewSet(CompanyScopedViewSet):
     queryset = GoodsReceipt.objects.select_related("purchase_order", "warehouse").prefetch_related("items").all()
     serializer_class = GoodsReceiptSerializer
+    permission_module = "purchases"
     filterset_fields = ["purchase_order", "warehouse"]
 
     def perform_create(self, serializer):
@@ -71,6 +73,10 @@ class PurchaseRequestViewSet(CompanyScopedViewSet):
         "supplier", "created_by", "approved_by",
     ).prefetch_related("items").all()
     serializer_class = PurchaseRequestSerializer
+    permission_module = "purchases"
+    # Approving/rejecting a request needs the dedicated `approve` permission
+    # (Owner/Admin/Procurement Officer), not just general purchase-write access.
+    permission_action_map = {"approve": "approve", "reject": "approve"}
     filterset_fields = ["supplier", "status"]
 
     def perform_create(self, serializer):

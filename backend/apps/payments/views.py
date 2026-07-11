@@ -5,6 +5,8 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import HasModulePermission
+
 from .models import PaymentIntent
 from .serializers import CreatePaymentIntentSerializer, PaymentIntentSerializer
 from .services import confirm_payment_intent, create_payment_intent, handle_webhook
@@ -12,7 +14,8 @@ from .services import confirm_payment_intent, create_payment_intent, handle_webh
 
 class PaymentIntentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = PaymentIntentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_module = "sales"
+    permission_classes = [permissions.IsAuthenticated, HasModulePermission]
     filterset_fields = ["invoice", "status", "provider"]
 
     def get_queryset(self):

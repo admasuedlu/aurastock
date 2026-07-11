@@ -127,6 +127,9 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
+        # Enforces per-role module permissions on views that set a
+        # `permission_module`; a no-op for those that don't.
+        "apps.core.permissions.HasModulePermission",
     ),
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
