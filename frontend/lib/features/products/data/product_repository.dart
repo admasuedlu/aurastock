@@ -35,6 +35,7 @@ class ProductRepository {
     required double reorderLevel,
     bool trackBatch = false,
     bool trackExpiry = false,
+    bool isBundle = false,
   }) async {
     final response = await _dio.post('/products/', data: {
       'name': name,
@@ -45,7 +46,38 @@ class ProductRepository {
       'reorder_level': reorderLevel,
       'track_batch': trackBatch,
       'track_expiry': trackExpiry,
+      if (isBundle) 'product_type': 'bundle',
     });
     return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<BundleComponent>> fetchBundleComponents(String bundleId) async {
+    final response = await _dio.get('/bundle-components/', queryParameters: {'bundle': bundleId});
+    final results = response.data['results'] as List;
+    return results.map((e) => BundleComponent.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> addBundleComponent(String bundleId, String componentId, double quantity) {
+    return _dio.post('/bundle-components/', data: {
+      'bundle': bundleId,
+      'component': componentId,
+      'quantity': quantity,
+    });
+  }
+
+  Future<void> removeBundleComponent(String id) {
+    return _dio.delete('/bundle-components/$id/');
+  }
+
+  Future<void> assembleBundle({
+    required String warehouseId,
+    required String bundleId,
+    required double quantity,
+  }) {
+    return _dio.post('/inventory/assemble/', data: {
+      'warehouse': warehouseId,
+      'bundle_product': bundleId,
+      'quantity': quantity,
+    });
   }
 }

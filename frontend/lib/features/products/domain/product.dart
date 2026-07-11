@@ -26,6 +26,7 @@ class Product {
     required this.barcode,
     required this.categoryName,
     required this.unitSymbol,
+    required this.productType,
     required this.costPrice,
     required this.sellingPrice,
     required this.reorderLevel,
@@ -42,6 +43,7 @@ class Product {
       barcode: json['barcode'] as String? ?? '',
       categoryName: json['category_name'] as String? ?? '',
       unitSymbol: json['unit_symbol'] as String? ?? '',
+      productType: json['product_type'] as String? ?? 'simple',
       costPrice: double.tryParse(json['cost_price'].toString()) ?? 0,
       sellingPrice: double.tryParse(json['selling_price'].toString()) ?? 0,
       reorderLevel: double.tryParse(json['reorder_level'].toString()) ?? 0,
@@ -57,6 +59,7 @@ class Product {
   final String barcode;
   final String categoryName;
   final String unitSymbol;
+  final String productType;
   final double costPrice;
   final double sellingPrice;
   final double reorderLevel;
@@ -65,4 +68,31 @@ class Product {
   final bool isActive;
 
   bool get isBatchTracked => trackBatch || trackExpiry;
+  bool get isBundle => productType == 'bundle';
+}
+
+class BundleComponent {
+  BundleComponent({
+    required this.id,
+    required this.componentId,
+    required this.componentName,
+    required this.componentSku,
+    required this.quantity,
+  });
+
+  factory BundleComponent.fromJson(Map<String, dynamic> json) {
+    return BundleComponent(
+      id: json['id'] as String,
+      componentId: json['component'] as String,
+      componentName: json['component_name'] as String? ?? '',
+      componentSku: json['component_sku'] as String? ?? '',
+      quantity: double.tryParse(json['quantity'].toString()) ?? 0,
+    );
+  }
+
+  final String id;
+  final String componentId;
+  final String componentName;
+  final String componentSku;
+  final double quantity;
 }

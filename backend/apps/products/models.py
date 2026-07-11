@@ -117,3 +117,21 @@ class ProductVariant(CompanyScopedModel):
 
     def effective_cost_price(self):
         return self.cost_price if self.cost_price is not None else self.product.cost_price
+
+
+class BundleComponent(CompanyScopedModel):
+    """One line of a bundle/kit's bill of materials: `quantity` units of
+    `component` go into one `bundle`. Assembling the bundle (see
+    apps.inventory.services.assemble_bundle) consumes the components and
+    produces bundle stock."""
+
+    bundle = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="bundle_components")
+    component = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="used_in_bundles")
+    quantity = models.DecimalField(max_digits=14, decimal_places=3, default=Decimal("1"))
+
+    class Meta:
+        unique_together = ("company", "bundle", "component")
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.quantity} × {self.component.sku} in {self.bundle.sku}"

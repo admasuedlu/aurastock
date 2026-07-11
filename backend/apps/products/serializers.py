@@ -2,7 +2,21 @@ from rest_framework import serializers
 
 from apps.core.numbering import next_value
 
-from .models import Brand, Category, Product, ProductVariant, UnitOfMeasure
+from .models import Brand, BundleComponent, Category, Product, ProductVariant, UnitOfMeasure
+
+
+class BundleComponentSerializer(serializers.ModelSerializer):
+    component_name = serializers.CharField(source="component.name", read_only=True)
+    component_sku = serializers.CharField(source="component.sku", read_only=True)
+
+    class Meta:
+        model = BundleComponent
+        fields = ["id", "bundle", "component", "component_name", "component_sku", "quantity"]
+
+    def validate(self, attrs):
+        if attrs["bundle"] == attrs["component"]:
+            raise serializers.ValidationError("A bundle cannot contain itself as a component.")
+        return attrs
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -43,6 +57,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     variants = ProductVariantSerializer(many=True, read_only=True)
+    components = BundleComponentSerializer(source="bundle_components", many=True, read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     brand_name = serializers.CharField(source="brand.name", read_only=True)
     unit_symbol = serializers.CharField(source="unit.symbol", read_only=True)
@@ -56,7 +71,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "cost_price", "selling_price", "tax_rate_percent",
             "reorder_level", "safety_stock",
             "track_serial", "track_batch", "track_expiry",
-            "image", "is_active", "variants", "created_at",
+            "image", "is_active", "variants", "components", "created_at",
         ]
         read_only_fields = ["sku"]
 

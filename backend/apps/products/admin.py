@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Brand, Category, Product, ProductVariant, UnitOfMeasure
+from .models import Brand, BundleComponent, Category, Product, ProductVariant, UnitOfMeasure
 
 
 @admin.register(Category)
@@ -24,9 +24,16 @@ class ProductVariantInline(admin.TabularInline):
     extra = 0
 
 
+class BundleComponentInline(admin.TabularInline):
+    model = BundleComponent
+    fk_name = "bundle"
+    extra = 0
+    raw_id_fields = ["component"]
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ["name", "sku", "company", "category", "selling_price", "is_active"]
     list_filter = ["company", "category", "product_type", "is_active"]
     search_fields = ["name", "sku", "barcode"]
-    inlines = [ProductVariantInline]
+    inlines = [ProductVariantInline, BundleComponentInline]

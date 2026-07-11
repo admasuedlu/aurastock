@@ -218,3 +218,35 @@ def adjust_stock(*, company, warehouse, product, variant=None, quantity_delta, r
         movement_type=movement_type, quantity=abs(quantity_delta),
         unit_cost=stock_item.average_cost, reason=reason, created_by=user, batch=batch,
     )
+
+
+@transaction.atomic
+def assemble_bundle(*, company, warehouse, bundle_product, quantity, user=None):
+    """Kitting: build `quantity` of a bundle by consuming its components' stock
+    and producing bundle stock. Each component's stock_out uses the normal
+    weighted-average (and FEFO if the component is batch-tracked), and the
+    bundle is stocked in at the summed component cost -- so a bundle's cost
+    reflects what actually went into it. Reuses the same guards as any
+    stock_out, so assembling more than the components allow is blocked."""
+    if quantity <= 0:
+        raise ValidationError("Assembly quantity must be positive.")
+
+    components = list(bundle_product.bundle_components.select_related("component").all())
+    if not components:
+        raise ValidationError(f"{bundle_product.name} has no components defined; nothing to assemble.")
+
+    reference = f"ASM-{bundle_product.sku}"
+    total_cost = Decimal("0")
+    for line in components:
+        movement = stock_out(
+            company=company, warehouse=warehouse, product=line.component,
+            quantity=line.quantity * quantity, reference=reference,
+            reason=f"Assembly of {bundle_product.sku}", user=user,
+        )
+        total_cost += movement.quantity * movement.unit_cost
+
+    return stock_in(
+        company=company, warehouse=warehouse, product=bundle_product,
+        quantity=quantity, unit_cost=total_cost / quantity, reference=reference,
+        reason="Assembly", user=user,
+    )

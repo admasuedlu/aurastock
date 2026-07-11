@@ -18,6 +18,7 @@ from apps.tenants.limits import enforce_plan_limit
 from . import services
 from .models import Batch, StockItem, StockMovement, Warehouse
 from .serializers import (
+    AssembleSerializer,
     BatchSerializer,
     StockAdjustmentSerializer,
     StockInSerializer,
@@ -164,6 +165,15 @@ class StockOutView(_StockActionView):
 class StockAdjustmentView(_StockActionView):
     serializer_class = StockAdjustmentSerializer
     service_fn = staticmethod(services.adjust_stock)
+
+
+class AssembleView(_StockActionView):
+    """Kitting: consume a bundle's components and produce bundle stock. Returns
+    the bundle's stock-in movement (so the shared base broadcasts the bundle's
+    new on-hand)."""
+
+    serializer_class = AssembleSerializer
+    service_fn = staticmethod(services.assemble_bundle)
 
 
 class StockTransferView(APIView):

@@ -74,7 +74,8 @@ Running the backend tests
 -------------------------
 There's a Django test suite (no extra dependencies — the built-in runner) covering
 the core invariants: weighted-average costing, insufficient-stock guards, batch/lot
-FEFO and the expiring-batches report, quotation→order→invoice conversion and partial
+FEFO and the expiring-batches report, bundle/kit assembly (component consumption +
+cost blending), quotation→order→invoice conversion and partial
 invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
 approval state machine, goods-receipt stock updates and over-receiving guard,
 journal-entry balancing and period-end close, and cross-tenant isolation / plan-limit
@@ -128,6 +129,19 @@ The app points at `http://127.0.0.1:8000/api/v1` by default (see `lib/core/confi
   `CompanyScopedViewSet` filters and stamps it automatically)
 - Product catalog: categories, brands, units of measure, products, variants,
   auto-generated SKUs (per-company numbering sequences, reusable for invoices/POs later)
+- Composite items / kitting: a bundle product carries a bill of materials
+  (`BundleComponent` lines — component product + quantity), and an **assemble**
+  operation (`POST /inventory/assemble/`) consumes the components and produces
+  bundle stock through the same inventory engine — component stock-outs use the
+  normal weighted-average (and FEFO if a component is batch-tracked), and the
+  bundle is stocked in at the summed component cost, so a bundle's unit cost
+  reflects what actually went into it. Assembling more than the components allow
+  is blocked (and rolls back atomically). Verified by tests (a gift box = 2 mugs +
+  1 card assembles 3 boxes, consuming 6 mugs + 3 cards, and the box lands at cost
+  9 = (6×4 + 3×1)/3). Flutter: a "bundle/kit" toggle on the product form and a
+  components-and-assemble sheet reachable from bundle rows in the product list.
+  (This is the kitting/assembly slice of composite items; full multi-level
+  manufacturing — work orders, routings — is out of scope.)
 - Inventory: warehouses, stock in/out/transfer/adjustment with weighted-average
   costing, insufficient-stock guards, low-stock querying, and full movement history
 - Batch / lot tracking with expiry dates: a product flagged `track_batch` (or

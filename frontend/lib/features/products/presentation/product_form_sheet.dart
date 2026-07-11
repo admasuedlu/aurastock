@@ -29,6 +29,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
   String? _unitId;
   bool _trackBatch = false;
   bool _trackExpiry = false;
+  bool _isBundle = false;
   bool _submitting = false;
 
   @override
@@ -53,6 +54,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             reorderLevel: double.tryParse(_reorderController.text) ?? 0,
             trackBatch: _trackBatch,
             trackExpiry: _trackExpiry,
+            isBundle: _isBundle,
           );
       ref.invalidate(productListProvider);
       if (mounted) Navigator.of(context).pop();
@@ -164,6 +166,13 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
                 _trackExpiry = v;
                 if (v) _trackBatch = true;
               }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Bundle / kit'),
+              subtitle: const Text('Assembled from component products'),
+              value: _isBundle,
+              onChanged: (v) => setState(() => _isBundle = v),
             ),
             const SizedBox(height: 24),
             FilledButton(

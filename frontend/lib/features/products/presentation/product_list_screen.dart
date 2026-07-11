@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 import '../providers/product_providers.dart';
+import 'bundle_sheet.dart';
 import 'product_form_sheet.dart';
 
 class ProductListScreen extends ConsumerWidget {
@@ -55,7 +56,20 @@ class ProductListScreen extends ConsumerWidget {
                   leading: CircleAvatar(child: Text(product.name.isNotEmpty ? product.name[0] : '?')),
                   title: Text(product.name),
                   subtitle: Text('${product.sku} · ${product.categoryName}'),
-                  trailing: Text(currency.format(product.sellingPrice)),
+                  trailing: product.isBundle
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(currency.format(product.sellingPrice)),
+                            IconButton(
+                              icon: const Icon(Icons.precision_manufacturing_outlined),
+                              tooltip: 'Bundle components / assemble',
+                              onPressed: () => showBundleSheet(context, product),
+                            ),
+                          ],
+                        )
+                      : Text(currency.format(product.sellingPrice)),
+                  onTap: product.isBundle ? () => showBundleSheet(context, product) : null,
                 ),
               );
             },

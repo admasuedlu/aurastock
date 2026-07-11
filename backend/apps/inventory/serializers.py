@@ -128,3 +128,12 @@ class StockAdjustmentSerializer(_CompanyScopedActionSerializer):
 
     def _scoped_fields(self):
         return {"warehouse": Warehouse, "product": Product, "variant": ProductVariant}
+
+
+class AssembleSerializer(_CompanyScopedActionSerializer):
+    warehouse = serializers.PrimaryKeyRelatedField(queryset=Warehouse.objects.none())
+    bundle_product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none())
+    quantity = serializers.DecimalField(max_digits=14, decimal_places=3, min_value=Decimal("0.001"))
+
+    def _scoped_fields(self):
+        return {"warehouse": Warehouse, "bundle_product": Product}

@@ -1,8 +1,9 @@
 from apps.core.viewsets import CompanyScopedViewSet
 
-from .models import Brand, Category, Product, ProductVariant, UnitOfMeasure
+from .models import Brand, BundleComponent, Category, Product, ProductVariant, UnitOfMeasure
 from .serializers import (
     BrandSerializer,
+    BundleComponentSerializer,
     CategorySerializer,
     ProductSerializer,
     ProductVariantSerializer,
@@ -43,3 +44,12 @@ class ProductVariantViewSet(CompanyScopedViewSet):
     serializer_class = ProductVariantSerializer
     filterset_fields = ["product", "is_active"]
     search_fields = ["sku", "barcode"]
+
+
+class BundleComponentViewSet(CompanyScopedViewSet):
+    """Manage a bundle's bill of materials -- the component lines the assemble
+    operation consumes. Filter by `?bundle=<id>` to load one bundle's recipe."""
+
+    queryset = BundleComponent.objects.select_related("component", "bundle").all()
+    serializer_class = BundleComponentSerializer
+    filterset_fields = ["bundle", "component"]
