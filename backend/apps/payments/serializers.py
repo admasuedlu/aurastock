@@ -3,6 +3,7 @@ from rest_framework import serializers
 from apps.sales.models import Invoice
 
 from .models import PaymentIntent
+from .providers import PROVIDERS
 
 
 class PaymentIntentSerializer(serializers.ModelSerializer):
@@ -23,6 +24,7 @@ class CreatePaymentIntentSerializer(serializers.Serializer):
     invoice = serializers.PrimaryKeyRelatedField(queryset=Invoice.objects.none())
     method = serializers.ChoiceField(choices=[c[0] for c in PaymentIntent.method.field.choices],
                                      default="telebirr")
+    provider = serializers.ChoiceField(choices=sorted(PROVIDERS), default="sandbox")
     amount = serializers.DecimalField(max_digits=14, decimal_places=2, required=False)
 
     def __init__(self, *args, **kwargs):

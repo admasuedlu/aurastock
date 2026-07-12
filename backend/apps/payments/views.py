@@ -30,6 +30,7 @@ class PaymentIntentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         try:
             intent = create_payment_intent(
                 invoice=data["invoice"], method=data["method"],
+                provider_name=data.get("provider", "sandbox"),
                 amount=data.get("amount"), user=request.user,
             )
         except DjangoValidationError as exc:

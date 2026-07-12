@@ -226,6 +226,18 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="notifications@aurasto
 # gateway would use that provider's own signing secret from its dashboard.
 PAYMENTS_SANDBOX_SECRET = config("PAYMENTS_SANDBOX_SECRET", default="sandbox-secret")
 
+# Where the gateway sends the payer back / posts the webhook. Override in prod
+# with the public URLs of the API and the web app.
+PAYMENTS_CALLBACK_BASE_URL = config("PAYMENTS_CALLBACK_BASE_URL", default="http://127.0.0.1:8000")
+PAYMENTS_RETURN_URL = config("PAYMENTS_RETURN_URL", default="http://127.0.0.1:8080/#/sales")
+
+# Chapa (Ethiopian payment aggregator: Telebirr, CBE Birr, cards). Leave the
+# keys empty to keep the provider dormant; set them to go live -- no code change.
+CHAPA_BASE_URL = config("CHAPA_BASE_URL", default="https://api.chapa.co/v1")
+CHAPA_SECRET_KEY = config("CHAPA_SECRET_KEY", default="")
+CHAPA_WEBHOOK_SECRET = config("CHAPA_WEBHOOK_SECRET", default="")
+CHAPA_DEFAULT_EMAIL = config("CHAPA_DEFAULT_EMAIL", default="payments@aurastock.local")
+
 if LOCAL_DEV_MODE:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 else:
