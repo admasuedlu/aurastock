@@ -125,6 +125,45 @@ class _InvoiceActionsSheetState extends ConsumerState<_InvoiceActionsSheet> {
     }
   }
 
+  Future<void> _payWithChapa() async {
+    setState(() => _busy = true);
+    Map<String, dynamic> intent;
+    try {
+      intent = await ref
+          .read(salesRepositoryProvider)
+          .createPaymentIntent(widget.invoice.id, method: 'telebirr', provider: 'chapa');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    final url = intent['checkout_url'] as String? ?? '';
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pay with Chapa'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Open this Chapa checkout link to pay with Telebirr, CBE Birr, or card. '
+                'The invoice updates automatically once Chapa confirms the payment.'),
+            const SizedBox(height: 12),
+            SelectableText(url, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
@@ -169,6 +208,12 @@ class _InvoiceActionsSheetState extends ConsumerState<_InvoiceActionsSheet> {
                   onPressed: _recordPayment,
                   icon: const Icon(Icons.payments_outlined),
                   label: const Text('Record payment'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _payWithChapa,
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: const Text('Pay with Chapa (Telebirr / CBE / card)'),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(

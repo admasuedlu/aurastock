@@ -147,37 +147,70 @@ class _SellingViewState extends ConsumerState<_SellingView> {
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      return Card(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => cartNotifier.addProduct(
-                            productId: product.id,
-                            productName: product.name,
-                            sku: product.sku,
-                            unitPrice: product.sellingPrice,
-                            taxPercent: 15,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  product.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleSmall,
+                      final scheme = Theme.of(context).colorScheme;
+                      final qtyInCart = cart
+                          .where((i) => i.productId == product.id)
+                          .fold<int>(0, (sum, i) => sum + i.quantity);
+                      final inCart = qtyInCart > 0;
+                      return Stack(
+                        children: [
+                          Card(
+                            color: inCart ? scheme.primaryContainer : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: inCart
+                                  ? BorderSide(color: scheme.primary, width: 2)
+                                  : BorderSide.none,
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => cartNotifier.addProduct(
+                                productId: product.id,
+                                productName: product.name,
+                                sku: product.sku,
+                                unitPrice: product.sellingPrice,
+                                taxPercent: 15,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.titleSmall,
+                                    ),
+                                    Text(product.sku, style: Theme.of(context).textTheme.bodySmall),
+                                    Text(
+                                      currency.format(product.sellingPrice),
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ),
-                                Text(product.sku, style: Theme.of(context).textTheme.bodySmall),
-                                Text(
-                                  currency.format(product.sellingPrice),
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
+                          if (inCart)
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: CircleAvatar(
+                                radius: 13,
+                                backgroundColor: scheme.primary,
+                                child: Text(
+                                  '$qtyInCart',
+                                  style: TextStyle(
+                                    color: scheme.onPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   );
@@ -192,12 +225,46 @@ class _SellingViewState extends ConsumerState<_SellingView> {
   }
 }
 
-class _CartBar extends ConsumerWidget {
+class _CartBar extends ConsumerStatefulWidget {
   const _CartBar({required this.sessionId});
   final String sessionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CartBar> createState() => _CartBarState();
+}
+
+class _CartBarState extends ConsumerState<_CartBar> {
+  bool _busy = false;
+
+  /// One-tap walk-in cash sale: exact cash, no sheet, no typing.
+  Future<void> _quickCash() async {
+    setState(() => _busy = true);
+    try {
+      final total = ref.read(cartControllerProvider.notifier).total;
+      await completePosSale(
+        context,
+        ref,
+        sessionId: widget.sessionId,
+        paymentMethod: 'cash',
+        amountTendered: total,
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showCartSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _CartDetailSheet(sessionId: widget.sessionId),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cart = ref.watch(cartControllerProvider);
     final cartNotifier = ref.read(cartControllerProvider.notifier);
     final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
@@ -208,21 +275,33 @@ class _CartBar extends ConsumerWidget {
       child: Material(
         color: scheme.surfaceContainerHigh,
         child: InkWell(
-          onTap: () => _showCartSheet(context, ref),
+          onTap: _showCartSheet,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Badge(
                   label: Text('${cart.fold<int>(0, (sum, i) => sum + i.quantity)}'),
                   child: const Icon(Icons.shopping_cart),
                 ),
-                const SizedBox(width: 16),
-                Expanded(child: Text('${cart.length} item(s)')),
-                Text(currency.format(cartNotifier.total), style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    currency.format(cartNotifier.total),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: _busy ? null : _quickCash,
+                  child: _busy
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Cash'),
+                ),
+                const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: () => showCheckoutSheet(context, sessionId),
+                  onPressed: _busy ? null : () => showCheckoutSheet(context, widget.sessionId),
                   child: const Text('Checkout'),
                 ),
               ],
@@ -230,14 +309,6 @@ class _CartBar extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-
-  void _showCartSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _CartDetailSheet(sessionId: sessionId),
     );
   }
 }

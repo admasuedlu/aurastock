@@ -13,6 +13,56 @@ Future<void> showCheckoutSheet(BuildContext context, String sessionId) {
   );
 }
 
+/// Posts the current cart as a POS sale, clears the cart, and shows the
+/// receipt dialog. Shared by the full checkout sheet and the one-tap "Cash"
+/// quick sale on the cart bar. The caller is responsible for catching errors.
+Future<void> completePosSale(
+  BuildContext context,
+  WidgetRef ref, {
+  required String sessionId,
+  required String paymentMethod,
+  required double amountTendered,
+  String? customerId,
+}) async {
+  final cart = ref.read(cartControllerProvider);
+  if (cart.isEmpty) return;
+  final txn = await ref.read(posRepositoryProvider).createTransaction(
+        sessionId: sessionId,
+        customerId: customerId,
+        paymentMethod: paymentMethod,
+        amountTendered: amountTendered,
+        items: cart
+            .map((item) => {
+                  'product': item.productId,
+                  'quantity': item.quantity,
+                  'unit_price': item.unitPrice,
+                  'tax_percent': item.taxPercent,
+                })
+            .toList(),
+      );
+  ref.read(cartControllerProvider.notifier).clear();
+  ref.invalidate(sessionTransactionsProvider(sessionId));
+  if (!context.mounted) return;
+  final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Sale complete — ${txn.number}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Total: ${currency.format(txn.total)}'),
+          if (txn.paymentMethod == 'cash') Text('Change due: ${currency.format(txn.changeDue)}'),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+      ],
+    ),
+  );
+}
+
 const _paymentMethods = [
   ('cash', 'Cash'),
   ('bank_transfer', 'Bank transfer'),

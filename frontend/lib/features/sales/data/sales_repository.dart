@@ -104,9 +104,18 @@ class SalesRepository {
   }
 
   /// Creates an online payment intent for an invoice; returns the raw intent
-  /// (including its `id` and `checkout_url`).
-  Future<Map<String, dynamic>> createPaymentIntent(String invoiceId, {String method = 'telebirr'}) async {
-    final response = await _dio.post('/payment-intents/', data: {'invoice': invoiceId, 'method': method});
+  /// (including its `id` and `checkout_url`). `provider` selects the gateway
+  /// ("sandbox" for the built-in simulator, "chapa" for the live aggregator).
+  Future<Map<String, dynamic>> createPaymentIntent(
+    String invoiceId, {
+    String method = 'telebirr',
+    String provider = 'sandbox',
+  }) async {
+    final response = await _dio.post('/payment-intents/', data: {
+      'invoice': invoiceId,
+      'method': method,
+      'provider': provider,
+    });
     return response.data as Map<String, dynamic>;
   }
 
