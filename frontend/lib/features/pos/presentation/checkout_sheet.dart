@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../customers/providers/customer_providers.dart';
 import '../providers/pos_providers.dart';
+import 'receipt.dart';
 
 Future<void> showCheckoutSheet(BuildContext context, String sessionId) {
   return showModalBottomSheet(
@@ -57,6 +58,11 @@ Future<void> completePosSale(
         ],
       ),
       actions: [
+        TextButton.icon(
+          onPressed: () => printPosReceipt(txn),
+          icon: const Icon(Icons.print_outlined),
+          label: const Text('Print receipt'),
+        ),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
       ],
     ),
