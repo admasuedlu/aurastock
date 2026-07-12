@@ -81,7 +81,10 @@ recorded payment, idempotent), quotation→order→invoice conversion and partia
 invoicing, invoice-confirm stock deduction + COGS posting, the purchase-request
 approval state machine, goods-receipt stock updates and over-receiving guard,
 journal-entry balancing and period-end close, cross-tenant isolation / plan-limit
-/ suspension enforcement, and per-role permission gating.
+/ suspension enforcement, per-role permission gating, POS sale/refund/cash
+reconciliation, low-stock + overdue-invoice notifications, the reporting numbers,
+the customer/supplier portal auth + cross-auth security matrix, and the statistical
+insights (reorder velocity, OLS demand-forecast trend, anomaly detection).
 
 ```
 USE_SQLITE=True python manage.py test apps
