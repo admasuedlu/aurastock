@@ -112,6 +112,16 @@ cd backend
 docker compose up --build
 ```
 
+Deploying to production
+-----------------------
+Set `DEBUG=False` and a long random `SECRET_KEY` (the app **refuses to boot** with
+the development default when `DEBUG=False`), plus your real `ALLOWED_HOSTS` /
+`CORS_ALLOWED_ORIGINS`. With `DEBUG=False`, HTTPS redirect, HSTS, and secure
+session/CSRF cookies turn on automatically — `python manage.py check --deploy`
+reports **no issues**. See `.env.example` for every variable. The settings assume
+a TLS-terminating reverse proxy in front (it trusts `X-Forwarded-Proto`); drop
+`SECURE_PROXY_SSL_HEADER` if Django terminates TLS itself.
+
 ## Running the frontend
 
 ```

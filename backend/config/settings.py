@@ -159,6 +159,35 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
 
+# --- Production security hardening ---
+# When DEBUG is off (i.e. in production), refuse to boot with the insecure
+# development SECRET_KEY and turn on HTTPS enforcement, HSTS, and secure cookies
+# -- clearing Django's `check --deploy` warnings. This whole block is a no-op in
+# development and in the test suite (both run with DEBUG=True), so the SQLite dev
+# flow and `manage.py test` are unaffected.
+if not DEBUG:
+    from django.core.exceptions import ImproperlyConfigured
+
+    if SECRET_KEY == "dev-only-insecure-key":
+        raise ImproperlyConfigured(
+            "SECRET_KEY is still the insecure development default. Set a strong, "
+            "random SECRET_KEY in the environment before running with DEBUG=False."
+        )
+
+    # Trust the reverse proxy / load balancer that terminates TLS, so Django sees
+    # requests as secure and SECURE_SSL_REDIRECT doesn't loop. (The docker-compose
+    # / typical deploy puts a proxy in front; drop this if Django terminates TLS.)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
 REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 
 if LOCAL_DEV_MODE:
