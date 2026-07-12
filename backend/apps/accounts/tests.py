@@ -91,3 +91,25 @@ class RolePermissionTests(TenantAPITestCase):
         self.assertEqual(
             self._client_as("Inventory Manager").post("/api/v1/inventory/stock-in/", payload, format="json").status_code,
             201)
+
+
+class LoginThrottleTests(TenantAPITestCase):
+    def test_repeated_login_attempts_are_rate_limited(self):
+        # Default cap is 10/min per IP; the 11th attempt from one client is 429,
+        # regardless of whether the credentials are valid (throttled before auth).
+        client = APIClient()
+        statuses = [
+            client.post("/api/v1/auth/token/",
+                        {"email": "bruteforce@example.test", "password": "guess"}, format="json").status_code
+            for _ in range(12)
+        ]
+        self.assertEqual(statuses[-1], 429)
+        self.assertIn(429, statuses)
+        self.assertLessEqual(statuses.count(429), 2)  # only the last couple, not all
+
+    def test_portal_login_shares_the_same_limit(self):
+        client = APIClient()
+        for _ in range(11):
+            last = client.post("/api/v1/portal/login/",
+                               {"email": "x@portal.test", "password": "guess"}, format="json")
+        self.assertEqual(last.status_code, 429)

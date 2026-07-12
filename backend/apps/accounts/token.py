@@ -1,4 +1,5 @@
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -22,3 +23,5 @@ class TenantAwareTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class TenantAwareTokenObtainPairView(TokenObtainPairView):
     serializer_class = TenantAwareTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"

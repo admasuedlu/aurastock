@@ -4,6 +4,7 @@ from rest_framework import mixins, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.purchasing.models import PurchaseOrder
@@ -26,6 +27,8 @@ from .tokens import issue_portal_token
 class PortalLoginView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request):
         serializer = PortalLoginSerializer(data=request.data)

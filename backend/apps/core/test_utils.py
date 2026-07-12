@@ -37,6 +37,12 @@ class TenantAPITestCase(APITestCase):
     minting a JWT each time."""
 
     def setUp(self):
+        # Reset DRF throttle counters (they live in the cache, which otherwise
+        # persists across tests in a process and makes login-throttle-adjacent
+        # tests order-dependent).
+        from django.core.cache import cache
+        cache.clear()
+
         self.company, self.user = make_company()
         self.client.force_authenticate(user=self.user)
         self.uom = UnitOfMeasure.objects.create(company=self.company, name="Piece", symbol="pc")

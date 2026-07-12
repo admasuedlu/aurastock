@@ -145,6 +145,9 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "user": "1000/hour",
         "anon": "100/hour",
+        # Per-IP cap on login attempts (staff JWT + portal login share this
+        # scope), to blunt credential brute-force. Tunable via env.
+        "login": config("LOGIN_THROTTLE_RATE", default="10/min"),
     },
 }
 
