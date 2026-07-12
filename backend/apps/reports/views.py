@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import HasModulePermission
 from apps.inventory.models import StockItem, StockMovement
 from apps.pos.models import POSTransaction, POSTransactionItem
 from apps.products.models import Product
@@ -43,13 +44,21 @@ def _line_revenue_expr():
     )
 
 
-class SalesSummaryView(APIView):
+class _ReportView(APIView):
+    """Base for all reporting endpoints. Guards them behind the `reports`
+    module so only roles granted `reports.view` (Owner, Admin, and the
+    managers) can read them -- reports expose company-wide sales, cost, and
+    valuation figures, so they shouldn't be open to every authenticated user."""
+
+    permission_classes = [IsAuthenticated, HasModulePermission]
+    permission_module = "reports"
+
+
+class SalesSummaryView(_ReportView):
     """Combines Invoice (confirmed and later) and completed POS transactions
     -- the two things that actually represent a sale in this system -- into
     one revenue picture. Powers the dashboard's Today's Sales / Monthly
     Revenue cards and a daily trend series for charting."""
-
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         company = request.user.company
@@ -87,11 +96,9 @@ class SalesSummaryView(APIView):
         })
 
 
-class TopProductsView(APIView):
+class TopProductsView(_ReportView):
     """Best sellers by revenue, combining invoice and POS line items over a
     date range (defaults to the last 30 days)."""
-
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         company = request.user.company
@@ -137,9 +144,7 @@ class TopProductsView(APIView):
         return Response({"start": start.isoformat(), "end": end.isoformat(), "rows": rows})
 
 
-class InventoryValuationView(APIView):
-    permission_classes = [IsAuthenticated]
-
+class InventoryValuationView(_ReportView):
     def get(self, request):
         company = request.user.company
         stock_items = StockItem.objects.filter(company=company, quantity_on_hand__gt=0).select_related(
@@ -176,11 +181,9 @@ class InventoryValuationView(APIView):
         })
 
 
-class DeadStockView(APIView):
+class DeadStockView(_ReportView):
     """Products still on the shelf with no outbound (sale) movement in the
     given window -- capital sitting idle in inventory."""
-
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         company = request.user.company
@@ -221,14 +224,12 @@ class DeadStockView(APIView):
         return Response({"days": days, "rows": rows})
 
 
-class PurchaseSummaryView(APIView):
+class PurchaseSummaryView(_ReportView):
     """The purchasing mirror of SalesSummaryView. Bases the trend on goods
     receipts valued at their received cost (quantity * unit_cost) rather than
     on purchase orders -- a receipt is the moment goods (and their cost)
     actually enter the business, the same way the sales report counts
     confirmed invoices/POS sales rather than draft quotations."""
-
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         company = request.user.company
@@ -264,15 +265,13 @@ class PurchaseSummaryView(APIView):
         })
 
 
-class AbcAnalysisView(APIView):
+class AbcAnalysisView(_ReportView):
     """Pareto (ABC) classification of products by their revenue contribution
     over a window (defaults to the last 365 days). Products are ranked by
     revenue, and walking down that ranking the running cumulative share of
     total revenue puts each into a class: A up to `a_threshold`% (the vital
     few), B up to `b_threshold`%, C the rest (the trivial many). Only products
     that actually sold in the window are classified."""
-
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         company = request.user.company

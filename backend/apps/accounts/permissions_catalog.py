@@ -30,12 +30,15 @@ ROLE_TEMPLATES = {
     },
     "Warehouse Manager": {
         "inventory": ["*"], "warehouses": ["*"], "products": ["view"], "reports": ["view"],
+        "purchases": ["view", "change"],
     },
     "Sales Person": {
         "sales": ["view", "add", "change"], "customers": ["*"], "products": ["view"],
+        "reports": ["view"],
     },
     "Cashier": {
         "pos": ["*"], "sales": ["view", "add"], "customers": ["view", "add"],
+        "inventory": ["view"],
     },
     "Accountant": {
         "accounting": ["*"], "reports": ["view"], "sales": ["view"], "purchases": ["view"],

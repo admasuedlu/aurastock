@@ -62,6 +62,11 @@ class GoodsReceiptViewSet(CompanyScopedViewSet):
     queryset = GoodsReceipt.objects.select_related("purchase_order", "warehouse").prefetch_related("items").all()
     serializer_class = GoodsReceiptSerializer
     permission_module = "purchases"
+    # Receiving goods against an existing PO is a "change" to the purchasing
+    # flow, not authoring a new document -- so it needs purchases.change
+    # (which a Warehouse Manager holds), distinct from purchases.add used to
+    # create/send purchase orders.
+    permission_action_map = {"create": "change"}
     filterset_fields = ["purchase_order", "warehouse"]
 
     def perform_create(self, serializer):
