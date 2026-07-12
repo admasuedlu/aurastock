@@ -47,7 +47,7 @@ class SalesRepository {
   }) async {
     final response = await _dio.post('/sales-orders/$orderId/convert-to-invoice/', data: {
       'warehouse': warehouseId,
-      if (items != null) 'items': items,
+      'items': ?items,
     });
     return Invoice.fromJson(response.data as Map<String, dynamic>);
   }

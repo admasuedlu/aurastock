@@ -73,7 +73,7 @@ class _CreateInvoiceSheetState extends ConsumerState<_CreateInvoiceSheet> {
             const SizedBox(height: 20),
             customersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (customers) => DropdownButtonFormField<String>(
                 initialValue: _customerId,
                 decoration: const InputDecoration(labelText: 'Customer'),
@@ -84,7 +84,7 @@ class _CreateInvoiceSheetState extends ConsumerState<_CreateInvoiceSheet> {
             const SizedBox(height: 16),
             warehousesAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (warehouses) => DropdownButtonFormField<String>(
                 initialValue: _warehouseId,
                 decoration: InputDecoration(labelText: l10n.warehouse),
@@ -95,7 +95,7 @@ class _CreateInvoiceSheetState extends ConsumerState<_CreateInvoiceSheet> {
             const SizedBox(height: 20),
             productsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (products) => LineItemEditor(
                 priceLabel: l10n.sellingPrice,
                 products: products

@@ -125,7 +125,7 @@ class InventoryScreen extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return Card(
@@ -140,7 +140,7 @@ class InventoryScreen extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('${item.quantityOnHand.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(item.quantityOnHand.toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.bold)),
                             Text(l10n.onHandStock, style: Theme.of(context).textTheme.bodySmall),
                           ],
                         ),
@@ -158,7 +158,7 @@ class InventoryScreen extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: movements.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final movement = movements[index];
                     return Card(

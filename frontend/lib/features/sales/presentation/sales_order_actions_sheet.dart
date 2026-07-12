@@ -138,7 +138,7 @@ class _SalesOrderActionsSheetState extends ConsumerState<_SalesOrderActionsSheet
             else ...[
               warehousesAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, __) => Text(l10n.errorGeneric),
+                error: (_, _) => Text(l10n.errorGeneric),
                 data: (warehouses) => DropdownButtonFormField<String>(
                   initialValue: _warehouseId,
                   decoration: InputDecoration(labelText: l10n.warehouse),

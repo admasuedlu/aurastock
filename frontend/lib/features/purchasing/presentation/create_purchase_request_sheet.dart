@@ -74,7 +74,7 @@ class _CreatePurchaseRequestSheetState extends ConsumerState<_CreatePurchaseRequ
             const SizedBox(height: 16),
             suppliersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (suppliers) => DropdownButtonFormField<String>(
                 initialValue: _supplierId,
                 decoration: const InputDecoration(labelText: 'Preferred supplier (optional)'),
@@ -85,7 +85,7 @@ class _CreatePurchaseRequestSheetState extends ConsumerState<_CreatePurchaseRequ
             const SizedBox(height: 20),
             productsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (products) => LineItemEditor(
                 priceLabel: l10n.costPrice,
                 products: products

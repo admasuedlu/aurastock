@@ -42,7 +42,7 @@ class _PosHistorySheet extends ConsumerWidget {
                     return ListView.separated(
                       controller: scrollController,
                       itemCount: transactions.length,
-                      separatorBuilder: (_, __) => const Divider(),
+                      separatorBuilder: (_, _) => const Divider(),
                       itemBuilder: (context, index) {
                         final txn = transactions[index];
                         final isRefunded = txn.status == 'refunded';

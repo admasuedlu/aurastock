@@ -30,7 +30,7 @@ class AccountingRepository {
     required String paymentMethod,
   }) async {
     final response = await _dio.post('/accounting/expenses/', data: {
-      if (categoryId != null) 'category': categoryId,
+      'category': ?categoryId,
       'amount': amount,
       'description': description,
       'payment_method': paymentMethod,

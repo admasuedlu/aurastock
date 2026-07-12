@@ -104,7 +104,7 @@ class _ReceiveGoodsSheetState extends ConsumerState<_ReceiveGoodsSheet> {
             const SizedBox(height: 20),
             warehousesAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (warehouses) => DropdownButtonFormField<String>(
                 initialValue: _warehouseId,
                 decoration: InputDecoration(labelText: l10n.warehouse),

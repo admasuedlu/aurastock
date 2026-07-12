@@ -153,7 +153,7 @@ class _PurchaseRequestActionsSheetState extends ConsumerState<_PurchaseRequestAc
                 if (request.supplierName.isEmpty)
                   ref.watch(supplierListProvider).when(
                         loading: () => const LinearProgressIndicator(),
-                        error: (_, __) => Text(l10n.errorGeneric),
+                        error: (_, _) => Text(l10n.errorGeneric),
                         data: (suppliers) => DropdownButtonFormField<String>(
                           initialValue: _supplierId,
                           decoration: const InputDecoration(labelText: 'Order from supplier'),

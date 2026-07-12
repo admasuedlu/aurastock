@@ -42,7 +42,7 @@ class PosRepository {
   }) async {
     final response = await _dio.post('/pos-transactions/', data: {
       'session': sessionId,
-      if (customerId != null) 'customer': customerId,
+      'customer': ?customerId,
       'payment_method': paymentMethod,
       'amount_tendered': amountTendered,
       'items': items,

@@ -53,7 +53,7 @@ class _ReorderTab extends ConsumerWidget {
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: rows.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final row = rows[index];
             return Card(
@@ -99,7 +99,7 @@ class _ForecastTab extends ConsumerWidget {
         children: [
           productsAsync.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (products) => DropdownButtonFormField<String>(
               initialValue: selectedProductId,
               decoration: const InputDecoration(labelText: 'Product'),
@@ -244,7 +244,7 @@ class _AnomaliesTab extends ConsumerWidget {
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: rows.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final row = rows[index];
             return Card(

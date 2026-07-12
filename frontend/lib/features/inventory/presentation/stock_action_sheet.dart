@@ -176,7 +176,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             const SizedBox(height: 20),
             productsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (products) => DropdownButtonFormField<String>(
                 initialValue: _productId,
                 decoration: const InputDecoration(labelText: 'Product'),
@@ -188,7 +188,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
             const SizedBox(height: 16),
             warehousesAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (warehouses) => DropdownButtonFormField<String>(
                 initialValue: _warehouseId,
                 decoration: InputDecoration(
@@ -203,7 +203,7 @@ class _StockActionSheetState extends ConsumerState<_StockActionSheet> {
               const SizedBox(height: 16),
               warehousesAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (warehouses) => DropdownButtonFormField<String>(
                   initialValue: _toWarehouseId,
                   decoration: const InputDecoration(labelText: 'To warehouse'),

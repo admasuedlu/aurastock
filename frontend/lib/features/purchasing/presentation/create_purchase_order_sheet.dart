@@ -66,7 +66,7 @@ class _CreatePurchaseOrderSheetState extends ConsumerState<_CreatePurchaseOrderS
             const SizedBox(height: 20),
             suppliersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (suppliers) => DropdownButtonFormField<String>(
                 initialValue: _supplierId,
                 decoration: const InputDecoration(labelText: 'Supplier'),
@@ -77,7 +77,7 @@ class _CreatePurchaseOrderSheetState extends ConsumerState<_CreatePurchaseOrderS
             const SizedBox(height: 20),
             productsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (products) => LineItemEditor(
                 priceLabel: l10n.costPrice,
                 products: products

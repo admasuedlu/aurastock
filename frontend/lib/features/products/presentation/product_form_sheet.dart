@@ -110,7 +110,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             const SizedBox(height: 16),
             categoriesAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (categories) => DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: InputDecoration(labelText: l10n.category),
@@ -123,7 +123,7 @@ class _ProductFormSheetState extends ConsumerState<_ProductFormSheet> {
             const SizedBox(height: 16),
             unitsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (units) => DropdownButtonFormField<String>(
                 initialValue: _unitId,
                 decoration: InputDecoration(labelText: l10n.unit),

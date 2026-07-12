@@ -65,7 +65,7 @@ class _OpenSessionViewState extends ConsumerState<OpenSessionView> {
               const SizedBox(height: 24),
               warehousesAsync.when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (warehouses) => DropdownButtonFormField<String>(
                   initialValue: _warehouseId,
                   decoration: InputDecoration(labelText: l10n.warehouse),

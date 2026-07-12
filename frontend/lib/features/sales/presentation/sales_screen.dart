@@ -95,7 +95,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: quotations.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final quotation = quotations[index];
                     return Card(
@@ -125,7 +125,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: orders.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final order = orders[index];
                     return Card(
@@ -155,7 +155,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: invoices.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final invoice = invoices[index];
                     return Card(
@@ -185,7 +185,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: customers.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final customer = customers[index];
                     return Card(

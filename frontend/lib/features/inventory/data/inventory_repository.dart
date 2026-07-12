@@ -48,7 +48,7 @@ class InventoryRepository {
       'reference': reference,
       'reason': reason,
       if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
-      if (expiryDate != null) 'expiry_date': expiryDate,
+      'expiry_date': ?expiryDate,
       if (serialNumbers != null && serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
     });
   }
@@ -102,7 +102,7 @@ class InventoryRepository {
       'quantity_delta': quantityDelta,
       'reason': reason,
       if (batchNumber != null && batchNumber.isNotEmpty) 'batch_number': batchNumber,
-      if (expiryDate != null) 'expiry_date': expiryDate,
+      'expiry_date': ?expiryDate,
       if (serialNumbers != null && serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
     });
   }

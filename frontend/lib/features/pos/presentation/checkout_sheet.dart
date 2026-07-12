@@ -155,7 +155,7 @@ class _CheckoutSheetState extends ConsumerState<CheckoutSheet> {
             const SizedBox(height: 16),
             customersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (customers) => DropdownButtonFormField<String>(
                 initialValue: _customerId,
                 decoration: const InputDecoration(labelText: 'Customer (optional — walk-in)'),

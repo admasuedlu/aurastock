@@ -68,7 +68,7 @@ class _CreateSalesOrderSheetState extends ConsumerState<_CreateSalesOrderSheet> 
             const SizedBox(height: 20),
             customersAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (customers) => DropdownButtonFormField<String>(
                 initialValue: _customerId,
                 decoration: const InputDecoration(labelText: 'Customer'),
@@ -79,7 +79,7 @@ class _CreateSalesOrderSheetState extends ConsumerState<_CreateSalesOrderSheet> 
             const SizedBox(height: 20),
             productsAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (products) => LineItemEditor(
                 priceLabel: l10n.sellingPrice,
                 products: products

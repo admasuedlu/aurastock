@@ -98,7 +98,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
             const SizedBox(height: 16),
             categoriesAsync.when(
               loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (categories) => DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(labelText: 'Category (optional)'),

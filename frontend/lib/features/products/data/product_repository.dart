@@ -41,7 +41,7 @@ class ProductRepository {
   }) async {
     final response = await _dio.post('/products/', data: {
       'name': name,
-      if (categoryId != null) 'category': categoryId,
+      'category': ?categoryId,
       'unit': unitId,
       'cost_price': costPrice,
       'selling_price': sellingPrice,

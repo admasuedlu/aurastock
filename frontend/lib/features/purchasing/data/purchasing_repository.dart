@@ -63,7 +63,7 @@ class PurchasingRepository {
     required List<LineItemDraft> items,
   }) async {
     final response = await _dio.post('/purchase-requests/', data: {
-      if (supplierId != null) 'supplier': supplierId,
+      'supplier': ?supplierId,
       'items': items
           .where((i) => i.isValid)
           .map((i) => {'product': i.productId, 'quantity': i.quantity, 'unit_price': i.unitPrice})
@@ -91,7 +91,7 @@ class PurchasingRepository {
   /// the request itself has no supplier set.
   Future<PurchaseOrder> convertRequestToPo(String id, {String? supplierId}) async {
     final response = await _dio.post('/purchase-requests/$id/convert-to-po/', data: {
-      if (supplierId != null) 'supplier': supplierId,
+      'supplier': ?supplierId,
     });
     return PurchaseOrder.fromJson(response.data as Map<String, dynamic>);
   }
