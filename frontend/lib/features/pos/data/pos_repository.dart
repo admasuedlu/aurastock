@@ -8,8 +8,12 @@ class PosRepository {
 
   Future<PosSession?> fetchCurrentSession() async {
     final response = await _dio.get('/pos-sessions/current/');
-    if (response.data == null) return null;
-    return PosSession.fromJson(response.data as Map<String, dynamic>);
+    // No open session: the API replies 200 with a null/empty body, which Dio
+    // surfaces as null or an empty string — anything that isn't a JSON object
+    // means "no current session".
+    final data = response.data;
+    if (data is! Map<String, dynamic>) return null;
+    return PosSession.fromJson(data);
   }
 
   Future<PosSession> openSession({required String warehouseId, required double openingCash}) async {
