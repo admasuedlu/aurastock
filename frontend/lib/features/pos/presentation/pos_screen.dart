@@ -42,39 +42,41 @@ class _SellingView extends ConsumerStatefulWidget {
 }
 
 class _SellingViewState extends ConsumerState<_SellingView> {
-  Future<void> _scanBarcode() async {
-    final controller = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Scan / enter barcode'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Barcode'),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Add')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (code == null || code.isEmpty) return;
+  final _scanController = TextEditingController();
+  final _scanFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    _scanFocus.dispose();
+    super.dispose();
+  }
+
+  /// Handles a completed scan. A USB/Bluetooth barcode scanner types the code
+  /// and sends Enter, which fires onSubmitted -- so we look the barcode up, add
+  /// the product, then clear and refocus so the next scan just works with no
+  /// tapping. Typing a code by hand and pressing Enter works the same way.
+  Future<void> _onScan(String code) async {
+    code = code.trim();
+    _scanController.clear();
+    _scanFocus.requestFocus();
+    if (code.isEmpty) return;
     try {
       final product = await ref.read(productRepositoryProvider).lookupByBarcode(code);
       if (!mounted) return;
       if (product == null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No product for barcode $code.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No product for barcode $code.'), duration: const Duration(seconds: 1)),
+        );
         return;
       }
       ref.read(cartControllerProvider.notifier).addProduct(
             productId: product.id, productName: product.name, sku: product.sku,
             unitPrice: product.sellingPrice, taxPercent: 15,
           );
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added ${product.name}.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Added ${product.name}'), duration: const Duration(milliseconds: 700)),
+      );
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
@@ -95,14 +97,18 @@ class _SellingViewState extends ConsumerState<_SellingView> {
             children: [
               Expanded(
                 child: TextField(
-                  decoration: const InputDecoration(hintText: 'Search products', prefixIcon: Icon(Icons.search)),
-                  onChanged: (value) => ref.read(productSearchProvider.notifier).state = value,
+                  controller: _scanController,
+                  focusNode: _scanFocus,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    hintText: 'Scan barcode — or type & press Enter',
+                    prefixIcon: Icon(Icons.qr_code_scanner_outlined),
+                    isDense: true,
+                  ),
+                  onSubmitted: _onScan,
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.qr_code_scanner_outlined),
-                tooltip: 'Scan barcode',
-                onPressed: _scanBarcode,
               ),
               IconButton(
                 icon: const Icon(Icons.receipt_long_outlined),
@@ -125,6 +131,17 @@ class _SellingViewState extends ConsumerState<_SellingView> {
                 },
               ),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search products by name',
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+            onChanged: (value) => ref.read(productSearchProvider.notifier).state = value,
           ),
         ),
         Expanded(
