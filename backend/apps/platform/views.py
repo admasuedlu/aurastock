@@ -39,7 +39,8 @@ class SubscriptionPlanViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "code"]
 
     def get_queryset(self):
-        return SubscriptionPlan.objects.annotate(company_count=Count("companies"))
+        # Ordered so pagination is stable (an unordered list can shuffle pages).
+        return SubscriptionPlan.objects.annotate(company_count=Count("companies")).order_by("code")
 
     def destroy(self, request, *args, **kwargs):
         try:
